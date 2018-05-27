@@ -8,48 +8,51 @@ import (
 )
 
 type Dice struct {
-	NumberOfDice int64
-	Sides        int64
-	result       int64
-	Max          int64
-	Min          int64
+	Count       int64
+	Sides       int64
+	resultTotal int64
+	Faces       []int64
+	Max         int64
+	Min         int64
 }
 type DiceSet struct {
-	Dice     []Dice
-	Results  []int64
-	DiceType string
-	Min      int64
-	Max      int64
+	Dice         []Dice
+	ResultTotals []int64
+	DiceType     string
+	Min          int64
+	Max          int64
 }
 
 func (d *DiceSet) Roll() ([]int64, error) {
+	d.Min, d.Max = 0, 0
 	for _, ds := range d.Dice {
 		result, err := ds.Roll()
 		if err != nil {
 			return nil, err
 		}
-		ds.Min += ds.NumberOfDice
-		ds.Max += ds.NumberOfDice * ds.Sides
-		d.Results = append(d.Results, result)
+		d.Min += ds.Count
+		d.Max += ds.Count * ds.Sides
+		d.ResultTotals = append(d.ResultTotals, result)
 	}
-	return d.Results, nil
+	return d.ResultTotals, nil
 }
 func (d *Dice) Roll() (int64, error) {
-	if d.result != 0 {
-		return d.result, nil
+	if d.resultTotal != 0 {
+		return d.resultTotal, nil
 	}
-	result, err := roll(d.NumberOfDice, d.Sides)
+	result, err := roll(d.Count, d.Sides)
 	if err != nil {
 		return 0, err
 	}
-	d.Min = d.NumberOfDice
-	d.Max = d.NumberOfDice * d.Sides
-	d.result = result
+	d.Min = d.Count
+	d.Max = d.Count * d.Sides
+	d.Faces = append(d.Faces, result)
+	d.resultTotal = result
 	return result, nil
 }
 func (d *Dice) Probability() float64 {
-	if d.result > 0 {
-		return diceProbability(d.NumberOfDice, d.Sides, d.result)
+	if d.resultTotal > 0 {
+		return diceProbability(d.Count, d.Sides, d.resultTotal)
 	}
 	return 0
 }

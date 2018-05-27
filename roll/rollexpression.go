@@ -85,7 +85,27 @@ func (r *RollExpression) TotalsString() string {
 	return buff.String()
 }
 
-//Total rolled all the dice and populates RollTotals and ExpandedText
+//FormattedString returns formatted string for human consumption
+func (r *RollExpression) FormattedString() string {
+	_, err := r.DiceSet.Roll()
+	if err != nil {
+		return ""
+	}
+	var fmtString []interface{}
+	for _, die := range r.DiceSet.Dice {
+		var buff bytes.Buffer
+		for i, result := range die.Faces {
+			buff.WriteString(strconv.FormatInt(result, 10))
+			if i != len(die.Faces) {
+				buff.WriteString(", ")
+			}
+		}
+		fmtString = append(fmtString, fmt.Sprintf("%dd%d(%s)", die.Count, die.Sides, buff.String()))
+	}
+	return fmt.Sprintf(r.ExpandedTextTemplate, fmtString...)
+}
+
+//Total rolls all the dice and populates RollTotals and ExpandedText
 func (r *RollExpression) Total() error {
 	m := make(map[string]int64)
 	rollTotals := []Total{}
@@ -109,7 +129,7 @@ func (r *RollExpression) Total() error {
 				if remainingSegments[i].EvaluationPriority == p && len(remainingSegments) > 1 && i > 0 {
 					var replacementSegment SegmentHalf
 					if remainingSegments[i].Operator == "d" {
-						d := Dice{NumberOfDice: lastSegment.Number, Sides: remainingSegments[i].Number}
+						d := Dice{Count: lastSegment.Number, Sides: remainingSegments[i].Number}
 						result, err := d.Roll()
 						if err != nil {
 							return err

@@ -22,6 +22,7 @@ type SlackRollJSONResponse struct {
 	Attachments []Attachment `json:"attachments"`
 }
 type Attachment struct {
+	Pretext    string  `json:"pretext"`
 	Fallback   string  `json:"fallback"`
 	Color      string  `json:"color"`
 	AuthorName string  `json:"author_name"`
@@ -72,16 +73,13 @@ func rollDecisionToSlackAttachment(decision *roll.RollDecision) (Attachment, err
 }
 
 func rollExpressionToSlackAttachment(expression *roll.RollExpression) (Attachment, error) {
-	err := expression.Total()
 	rollTotals := expression.RollTotals
-	attachment := Attachment{}
-	if err != nil {
-		return attachment, err
-	}
-	attachment = Attachment{
-		Fallback:   createAttachmentsDamageString(rollTotals),
-		AuthorName: expression.String(),
+	attachment := Attachment{
+		Pretext:    expression.InitialText,
+		Fallback:   expression.TotalsString(),
+		AuthorName: expression.FormattedString(),
 		Color:      stringToColor(expression.InitialText)}
+
 	totalRoll := int64(0)
 	allUnspecified := true
 	rollCount := 0

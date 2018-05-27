@@ -7,7 +7,6 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httputil"
-	"strconv"
 	"strings"
 
 	"github.com/aasmall/dicemagic/roll"
@@ -234,12 +233,13 @@ func handleRollCommand(ctx context.Context, command roll.RollCommand, w http.Res
 		}
 		// Populate generic Fulfillment Messages
 		fulfillmentMessage := rollExpressionToFulfillmentMessage(&command.RollExpresions[i])
+		dialogueFlowResponse.FulfillmentMessages = append(dialogueFlowResponse.FulfillmentMessages, fulfillmentMessage)
+		// Populate slack Payload
 		attachment, err := rollExpressionToSlackAttachment(&command.RollExpresions[i])
 		if err != nil {
 			printErrorToDialogFlow(ctx, err, w, r)
 			return
 		}
-		dialogueFlowResponse.FulfillmentMessages = append(dialogueFlowResponse.FulfillmentMessages, fulfillmentMessage)
 		slackRollResponse.Attachments = append(slackRollResponse.Attachments, attachment)
 		markdownRow, loopTotal, err := rollExpressionToMarkdown(&command.RollExpresions[i])
 		formattedText.WriteString(markdownRow)
@@ -293,7 +293,7 @@ func handleDecideIntent(ctx context.Context, dialogueFlowRequest DialogueFlowReq
 		}
 		log.Debugf(ctx, fmt.Sprintf("Choices(%d): %v", len(rollDecision.Choices), rollDecision.Choices))
 	}
-	d := roll.Dice{NumberOfDice: int64(1), Sides: int64(len(rollDecision.Choices))}
+	d := roll.Dice{Count: int64(1), Sides: int64(len(rollDecision.Choices))}
 	result, err := d.Roll()
 	if err != nil {
 		log.Errorf(ctx, "Couldn't roll dice: %v", err)
@@ -349,24 +349,9 @@ func rollExpressionToFulfillmentMessage(expression *roll.RollExpression) DialogF
 	//Dice rolls into Expanded, formatted string
 	var fmtString []interface{}
 	for i, d := range expression.DiceSet.Dice {
-		fmtString = append(fmtString, fmt.Sprintf("%dd%d(%d)", d.NumberOfDice, d.Sides, expression.DiceSet.Results[i]))
+		fmtString = append(fmtString, fmt.Sprintf("%dd%d(%d)", d.Count, d.Sides, expression.DiceSet.ResultTotals[i]))
 	}
-	returnMessage.DialogFlowCard.Title = fmt.Sprintf(expression.ExpandedTextTemplate, fmtString...)
-	var buff bytes.Buffer
-	rollTotal := int64(0)
-	for i, t := range expression.RollTotals {
-		rollTotal += t.RollResult
-		buff.WriteString(strconv.FormatInt(t.RollResult, 10))
-		buff.WriteString(" [")
-		buff.WriteString(t.RollType)
-		buff.WriteString("]")
-		if i != len(expression.RollTotals) {
-			buff.WriteString("\n")
-		} else {
-			buff.WriteString("\nFor a total of: ")
-			buff.WriteString(strconv.FormatInt(rollTotal, 10))
-		}
-	}
+	returnMessage.DialogFlowCard.Title = expression.FormattedString()
 	returnMessage.DialogFlowCard.Subtitle = expression.TotalsString()
 	return returnMessage
 }
