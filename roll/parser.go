@@ -243,6 +243,14 @@ func (p *Parser) MustParse() *RollExpression {
 	return r
 }
 
+//MustParseTotal calls parse and Total without returning an error.
+//Probably only use this in tests.
+func (p *Parser) MustParseTotal() *RollExpression {
+	r, _ := p.Parse()
+	r.Total()
+	return r
+}
+
 //Parse populates RollExpression from p Parser
 func (p *Parser) Parse() (*RollExpression, error) {
 	expression := new(RollExpression)

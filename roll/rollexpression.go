@@ -94,9 +94,9 @@ func (r *RollExpression) FormattedString() string {
 	var fmtString []interface{}
 	for _, die := range r.DiceSet.Dice {
 		var buff bytes.Buffer
-		for i, result := range die.Faces {
-			buff.WriteString(strconv.FormatInt(result, 10))
-			if i != len(die.Faces) {
+		for i := 0; i < len(die.Faces); i++ {
+			buff.WriteString(strconv.FormatInt(die.Faces[i], 10))
+			if i+1 != len(die.Faces) {
 				buff.WriteString(", ")
 			}
 		}
@@ -194,7 +194,7 @@ func doMath(leftMod SegmentHalf, rightmod SegmentHalf) (SegmentHalf, error) {
 	case "-":
 		m.Number = leftMod.Number - rightmod.Number
 	case "d":
-		num, err := roll(leftMod.Number, rightmod.Number)
+		_, num, err := roll(leftMod.Number, rightmod.Number)
 		m.Number = num
 		if err != nil {
 			return m, err

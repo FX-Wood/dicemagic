@@ -43,3 +43,20 @@ func TestRollExpression_Total(t *testing.T) {
 		})
 	}
 }
+
+func TestRollExpression_FormattedString(t *testing.T) {
+	tests := []struct {
+		name string
+		r    *RollExpression
+		want string
+	}{{name: "Complex",
+		r:    NewParser(strings.NewReader("ROLL (six D1+7)/2[mundane]+4d1[fire]")).MustParseTotal(),
+		want: "(6d1(1, 1, 1, 1, 1, 1)+7)/2[Mundane]+4d1(1, 1, 1, 1)[Fire]"}}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			if got := tt.r.FormattedString(); got != tt.want {
+				t.Errorf("RollExpression.FormattedString() = %v, want %v", got, tt.want)
+			}
+		})
+	}
+}

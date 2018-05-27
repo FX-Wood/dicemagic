@@ -40,13 +40,13 @@ func (d *Dice) Roll() (int64, error) {
 	if d.resultTotal != 0 {
 		return d.resultTotal, nil
 	}
-	result, err := roll(d.Count, d.Sides)
+	faces, result, err := roll(d.Count, d.Sides)
 	if err != nil {
 		return 0, err
 	}
 	d.Min = d.Count
 	d.Max = d.Count * d.Sides
-	d.Faces = append(d.Faces, result)
+	d.Faces = faces
 	d.resultTotal = result
 	return result, nil
 }
@@ -59,26 +59,28 @@ func (d *Dice) Probability() float64 {
 
 //Roll creates a random number that represents the roll of
 //some dice
-func roll(numberOfDice int64, sides int64) (int64, error) {
+func roll(numberOfDice int64, sides int64) ([]int64, int64, error) {
+	var faces []int64
 	if numberOfDice > 1000 {
 		err := fmt.Errorf("I can't hold that many dice")
-		return 0, err
+		return faces, 0, err
 	} else if sides > 1000 {
 		err := fmt.Errorf("A die with that many sides is basically round")
-		return 0, err
+		return faces, 0, err
 	} else if sides < 1 {
 		err := fmt.Errorf("/me ponders the meaning of a zero sided die")
-		return 0, err
+		return faces, 0, err
 	} else {
-		result := int64(0)
+		total := int64(0)
 		for i := int64(0); i < numberOfDice; i++ {
-			x, err := generateRandomInt(1, int64(sides))
+			face, err := generateRandomInt(1, int64(sides))
 			if err != nil {
-				return 0, err
+				return faces, 0, err
 			}
-			result += x
+			faces = append(faces, face)
+			total += face
 		}
-		return result, nil
+		return faces, total, nil
 	}
 }
 

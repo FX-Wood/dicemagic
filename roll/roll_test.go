@@ -110,7 +110,7 @@ func testRoll(t *testing.T, biasMod int64, biasTo int64, biasFreq float64, loops
 	}
 	biasCount := 0
 	for i := 0; i < loops; i++ {
-		x, err := roll(numberOfDice, sides)
+		_, x, err := roll(numberOfDice, sides)
 		if err != nil {
 			return false, err
 		}
