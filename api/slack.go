@@ -75,7 +75,6 @@ func rollDecisionToSlackAttachment(decision *roll.RollDecision) (Attachment, err
 func rollExpressionToSlackAttachment(expression *roll.RollExpression) (Attachment, error) {
 	rollTotals := expression.RollTotals
 	attachment := Attachment{
-		Pretext:    expression.InitialText,
 		Fallback:   expression.TotalsString(),
 		AuthorName: expression.FormattedString(),
 		Color:      stringToColor(expression.InitialText)}
@@ -97,13 +96,18 @@ func rollExpressionToSlackAttachment(expression *roll.RollExpression) (Attachmen
 		field = Field{Title: fmt.Sprintf("%d", totalRoll), Short: false}
 		attachment.Fields = append(attachment.Fields, field)
 	} else {
-		for _, e := range rollTotals {
-			totalRoll += e.RollResult
-			fieldTitle := e.RollType
-			if e.RollType == "" {
+		for _, total := range rollTotals {
+			totalRoll += total.RollResult
+			var fieldTitle string
+			if total.RollType == "" {
 				fieldTitle = "_Unspecified_"
+			} else {
+				fieldTitle = total.RollType
 			}
-			field := Field{Title: fieldTitle, Value: fmt.Sprintf("%d", e.RollResult), Short: true}
+			field := Field{
+				Title: fmt.Sprintf("%s: %d", fieldTitle, total.RollResult),
+				Value: fmt.Sprintf("Rolls: %s", roll.Int64SliceToCSV(total.Faces...)),
+				Short: true}
 			attachment.Fields = append(attachment.Fields, field)
 		}
 		if rollCount > 1 {

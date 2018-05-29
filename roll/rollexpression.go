@@ -2,6 +2,7 @@ package roll
 
 import (
 	"bytes"
+	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -15,14 +16,70 @@ type RollExpression struct {
 	DiceSet              DiceSet       `datastore:",noindex"`
 	SegmentHalfs         []SegmentHalf `datastore:",noindex"`
 	RollTotals           []Total       `datastore:",noindex"`
+	MathTree             MathTree
+}
+type MathTree struct {
+	Root *MathNode
+}
+type MathNode struct {
+	Left     *MathNode
+	Right    *MathNode
+	Operator string
+	Data     MathData
+}
+type MathData struct {
+	SegmentType string
+	Value       int64
 }
 
-//Segment is a mathmatical expression
-type Segment struct {
-	leftSegment        SegmentHalf
-	rightSegment       SegmentHalf
-	SegmentType        string `datastore:",noindex"`
-	EvaluationPriority int    `datastore:",noindex"`
+func (t *MathTree) Insert(priority int, data MathData) error {
+	if t.Root == nil {
+		t.Root = &MathNode{Priority: priority, Data: data}
+		return nil
+	}
+	return t.Root.Insert(priority, data)
+}
+func (n *MathNode) Insert(priority int, data MathData) error {
+	if n == nil {
+		return errors.New("Cannot insert a value into a nil tree")
+	}
+	switch {
+	case priority == n.Priority:
+		if n.Left == nil {
+			n.Left = &MathNode{Priority: priority, Data: data}
+			return nil
+		} else if n.Right == nil {
+			n.Right = &MathNode{Priority: priority, Data: data}
+			return nil
+		} else {
+			return n.Left.Insert(priority-1, data)
+		}
+	case priority < n.Priority:
+		if n.Left == nil {
+			n.Left = &MathNode{Priority: priority, Data: data}
+			return nil
+		}
+		return n.Left.Insert(priority, data)
+	case priority > n.Priority:
+		if n.Right == nil {
+			n.Right = &MathNode{Priority: priority, Data: data}
+			return nil
+		}
+		return n.Right.Insert(priority, data)
+	}
+	return nil
+}
+
+func insert(t *MathTree, value int64, segmentType string, operator string, priority int) *MathTree {
+	if t == nil {
+		return &MathTree{Left: nil, Right: nil, SegmentType: segmentType, Value: value, Operator: operator, Priority: priority}
+	}
+	if priority < t.Priority {
+		t.Left = insert(t.Left, value, segmentType, operator, priority)
+		return t
+	}
+	t.Right = insert(t.Right, value, segmentType, operator, priority)
+	return t
 }
 
 //SegmentHalf is half of a mathmatical expression along it's its evaluation priority
@@ -30,13 +87,14 @@ type SegmentHalf struct {
 	Operator           string `datastore:",noindex"`
 	Number             int64  `datastore:",noindex"`
 	SegmentType        string `datastore:",noindex"`
-	EvaluationPriority int    `datastore:",noindex"`
+	EvaluationPriority int
 }
 
 //Total represents collapsed Segments that have been evaluated
 type Total struct {
 	RollType   string
 	RollResult int64
+	Faces      []int64
 }
 
 func getHighestPriority(r []SegmentHalf) int {
@@ -93,21 +151,26 @@ func (r *RollExpression) FormattedString() string {
 	}
 	var fmtString []interface{}
 	for _, die := range r.DiceSet.Dice {
-		var buff bytes.Buffer
-		for i := 0; i < len(die.Faces); i++ {
-			buff.WriteString(strconv.FormatInt(die.Faces[i], 10))
-			if i+1 != len(die.Faces) {
-				buff.WriteString(", ")
-			}
-		}
-		fmtString = append(fmtString, fmt.Sprintf("%dd%d(%s)", die.Count, die.Sides, buff.String()))
+		fmtString = append(fmtString, fmt.Sprintf("%dd%d(%s)", die.Count, die.Sides, Int64SliceToCSV(die.Faces...)))
 	}
 	return fmt.Sprintf(r.ExpandedTextTemplate, fmtString...)
 }
 
+func Int64SliceToCSV(s ...int64) string {
+	var buff bytes.Buffer
+	for i := 0; i < len(s); i++ {
+		buff.WriteString(strconv.FormatInt(s[i], 10))
+		if i+1 != len(s) {
+			buff.WriteString(", ")
+		}
+	}
+	return buff.String()
+}
+
 //Total rolls all the dice and populates RollTotals and ExpandedText
 func (r *RollExpression) Total() error {
-	m := make(map[string]int64)
+	totalsMap := make(map[string]int64)
+	facesMap := make(map[string][]int64)
 	rollTotals := []Total{}
 	//break segments into their Damage Types
 	segmentsPerSegmentType := make(map[string][]SegmentHalf)
@@ -123,7 +186,7 @@ func (r *RollExpression) Total() error {
 		//loop through priorities
 		for p := highestPriority; p < 1; p++ {
 			for i := 0; i < len(remainingSegments); i++ {
-				if !strings.ContainsAny(remainingSegments[i].Operator, "d+-*/") {
+				if !strings.ContainsAny(remainingSegments[i].Operator, "+-*/") {
 					return fmt.Errorf("%s is not a valid operator", remainingSegments[i].Operator)
 				}
 				if remainingSegments[i].EvaluationPriority == p && len(remainingSegments) > 1 && i > 0 {
@@ -136,6 +199,9 @@ func (r *RollExpression) Total() error {
 						}
 						r.DiceSet.Dice = append(r.DiceSet.Dice, d)
 						replacementSegment = SegmentHalf{Operator: lastSegment.Operator, EvaluationPriority: lastSegment.EvaluationPriority, Number: result}
+						for _, face := range d.Faces {
+							facesMap[k] = append(facesMap[k], face)
+						}
 					} else {
 						var err error
 						replacementSegment, err = doMath(lastSegment, remainingSegments[i])
@@ -152,17 +218,17 @@ func (r *RollExpression) Total() error {
 			}
 		}
 		//I have fully collapsed this loop. Add to final result.
-		m[k] += int64(lastSegment.Number)
+		totalsMap[k] += int64(lastSegment.Number)
 	}
 
 	//sort it
 	var keys []string
-	for k := range m {
+	for k := range totalsMap {
 		keys = append(keys, k)
 	}
 	sort.Strings(keys)
 	for _, k := range keys {
-		rollTotals = append(rollTotals, Total{RollType: k, RollResult: m[k]})
+		rollTotals = append(rollTotals, Total{RollType: k, RollResult: totalsMap[k], Faces: facesMap[k]})
 	}
 	r.DiceSet.Roll()
 	r.RollTotals = rollTotals

@@ -27,8 +27,19 @@ const (
 	operatorToken // + - * /
 	numberToken   // Sides, Number of Dice
 	ident         //Damage Types
+	diceNotation
 	eofToken
 )
+var opa = map[string]struct {
+	prec   int
+	rAssoc bool
+}{
+	"^": {4, true},
+	"*": {3, false},
+	"/": {3, false},
+	"+": {2, false},
+	"-": {2, false},
+}
 
 //go:generate stringer -type=Token
 
@@ -81,7 +92,8 @@ func (s *Scanner) scan() (tok token, lit string) {
 		return s.scanWhitespace()
 	} else if isLetter(ch) {
 		if ch == 'd' || ch == 'D' {
-			return operatorToken, string(ch)
+			s.unread()
+			return s.scanOneThenNumber()
 		}
 		s.unread()
 		return s.scanIdent()
@@ -170,6 +182,14 @@ func (s *Scanner) scanIdent() (tok token, lit string) {
 	return ident, buf.String()
 }
 
+func (s *Scanner) scanOneThenNumber() (tok token, lit string) {
+	var buf bytes.Buffer
+	_, _ = buf.WriteRune('1')
+	_, lit = s.scanNumber()
+	buf.WriteString(lit)
+	return diceNotation, buf.String()
+}
+
 // scanIdent consumes the current rune and all contiguous numberic runes.
 func (s *Scanner) scanNumber() (tok token, lit string) {
 	// Create a buffer and read the current character into it.
@@ -178,15 +198,22 @@ func (s *Scanner) scanNumber() (tok token, lit string) {
 
 	// Read every subsequent ident character into the buffer.
 	// Non-ident characters and EOF will cause the loop to exit.
+	foundDice := false
 	for {
 		if ch := s.read(); ch == eof {
 			break
+		} else if ch == 'd' || ch == 'D' {
+			foundDice = true
+			_, _ = buf.WriteRune(ch)
 		} else if !isNumber(ch) {
 			s.unread()
 			break
 		} else {
 			_, _ = buf.WriteRune(ch)
 		}
+	}
+	if foundDice {
+		return diceNotation, buf.String()
 	}
 	return numberToken, buf.String()
 }
@@ -265,8 +292,8 @@ func (p *Parser) Parse() (*RollExpression, error) {
 
 	tok, lit = illegal, ""
 	evalOrder := 0
-	lenOfLastNumber := 0
 	ignoreNextNumber := false
+	mathTree := new(MathTree)
 	//dat parse loops
 	for {
 		//create this loops objects
@@ -331,18 +358,31 @@ func (p *Parser) Parse() (*RollExpression, error) {
 			initialTextBuffer.WriteString("]")
 			expandedTextBuffer.WriteString("]")
 			continue
-
 		}
+		//optional: DICE
+		if dice, found := populateOptional(tok, lit, diceNotation); found {
+			evalOrder--
+			splitDice := strings.Split(dice, "d")
+			segmentHalf.Operator = "d"
+			segmentHalf.Number, _ = strconv.ParseInt(splitDice[0], 10, 0)
+			expression.SegmentHalfs = append(expression.SegmentHalfs, *segmentHalf)
+			insert(mathTree, segmentHalf.Number, segmentHalf.SegmentType, segmentHalf.Operator, segmentHalf.EvaluationPriority)
+			for i := 1; i < len(splitDice); i++ {
+				segmentHalf = new(SegmentHalf)
+				segmentHalf.Operator = "d"
+				segmentHalf.Number, _ = strconv.ParseInt(splitDice[i], 10, 0)
+				expression.SegmentHalfs = append(expression.SegmentHalfs, *segmentHalf)
+				insert(mathTree, segmentHalf.Number, segmentHalf.SegmentType, segmentHalf.Operator, segmentHalf.EvaluationPriority)
+			}
+			evalOrder++
+			tok, lit = p.scanIgnoreWhitespace()
+		}
+
 		//optional: OPERATOR
 		if operator, found := populateOptional(tok, lit, operatorToken); found {
 			segmentHalf.Operator = strings.ToLower(operator)
-			initialTextBuffer.WriteString(segmentHalf.Operator)
-			if segmentHalf.Operator == "d" {
-				expandedTextBuffer.Truncate(expandedTextBuffer.Len() - lenOfLastNumber)
-				expandedTextBuffer.WriteString("%s")
-				ignoreNextNumber = true
-			} else {
-				expandedTextBuffer.WriteString(segmentHalf.Operator)
+			if segmentHalf.Operator == "/" || segmentHalf.Operator == "*" {
+				evalOrder--
 			}
 			tok, lit = p.scanIgnoreWhitespace()
 		} else {
@@ -357,9 +397,9 @@ func (p *Parser) Parse() (*RollExpression, error) {
 			} else {
 				expandedTextBuffer.WriteString(number)
 			}
-			lenOfLastNumber = len([]byte(lit))
 			segmentHalf.Number = foundNumber
 		}
+		insert(mathTree, segmentHalf.Number, segmentHalf.SegmentType, segmentHalf.Operator, segmentHalf.EvaluationPriority)
 		expression.SegmentHalfs = append(expression.SegmentHalfs, *segmentHalf)
 	}
 	//force dice rolls to highest priority
@@ -377,6 +417,7 @@ func (p *Parser) Parse() (*RollExpression, error) {
 
 	expression.InitialText = initialTextBuffer.String()
 	expression.ExpandedTextTemplate = expandedTextBuffer.String()
+	expression.MathTree = *mathTree
 	return expression, nil
 }
 
