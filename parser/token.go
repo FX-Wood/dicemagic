@@ -1,12 +1,12 @@
 package main
 
-type nudFn func(*token, *parser) *token
+type nudFn func(*ast, *parser) *ast
 
-type ledFn func(*token, *parser, *token) *token
+type ledFn func(*ast, *parser, *ast) *ast
 
-type stdFn func(*token, *parser) *token
+type stdFn func(*ast, *parser) *ast
 
-type token struct {
+type ast struct {
 	sym          string
 	value        string
 	line         int
@@ -15,5 +15,5 @@ type token struct {
 	nud          nudFn
 	led          ledFn
 	std          stdFn
-	children     []*token
+	children     []*ast
 }

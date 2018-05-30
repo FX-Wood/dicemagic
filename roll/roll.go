@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"math"
 	"math/big"
+	"sort"
 )
 
 type Dice struct {
@@ -14,6 +15,8 @@ type Dice struct {
 	Faces       []int64
 	Max         int64
 	Min         int64
+	H           int64
+	L           int64
 }
 type DiceSet struct {
 	Dice         []Dice
@@ -31,7 +34,7 @@ func (d *DiceSet) Roll() ([]int64, error) {
 			return nil, err
 		}
 		d.Min += ds.Count
-		d.Max += ds.Count * ds.Sides
+		d.Max += (ds.Count - (ds.H + ds.L)) * ds.Sides
 		d.ResultTotals = append(d.ResultTotals, result)
 	}
 	return d.ResultTotals, nil
@@ -40,12 +43,12 @@ func (d *Dice) Roll() (int64, error) {
 	if d.resultTotal != 0 {
 		return d.resultTotal, nil
 	}
-	faces, result, err := roll(d.Count, d.Sides)
+	faces, result, err := roll(d.Count, d.Sides, d.H, d.L)
 	if err != nil {
 		return 0, err
 	}
 	d.Min = d.Count
-	d.Max = d.Count * d.Sides
+	d.Max = (d.Count - (d.H + d.L)) * d.Sides
 	d.Faces = faces
 	d.resultTotal = result
 	return result, nil
@@ -59,7 +62,7 @@ func (d *Dice) Probability() float64 {
 
 //Roll creates a random number that represents the roll of
 //some dice
-func roll(numberOfDice int64, sides int64) ([]int64, int64, error) {
+func roll(numberOfDice int64, sides int64, H int64, L int64) ([]int64, int64, error) {
 	var faces []int64
 	if numberOfDice > 1000 {
 		err := fmt.Errorf("I can't hold that many dice")
@@ -80,6 +83,9 @@ func roll(numberOfDice int64, sides int64) ([]int64, int64, error) {
 			faces = append(faces, face)
 			total += face
 		}
+		sort.Slice(faces, func(i, j int) bool { return faces[i] < faces[j] })
+		faces = faces[H:]
+		faces = faces[:L]
 		return faces, total, nil
 	}
 }

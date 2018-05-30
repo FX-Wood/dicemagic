@@ -8,8 +8,8 @@ type parser struct {
 	lexer *lexer
 }
 
-func (self *parser) expression(rbp int) *token {
-	var left *token
+func (self *parser) expression(rbp int) *ast {
+	var left *ast
 	t := self.lexer.next()
 
 	if t.nud != nil {
@@ -29,17 +29,20 @@ func (self *parser) expression(rbp int) *token {
 	return left
 }
 
-func (self *parser) statements() []*token {
-	stmts := []*token{}
+func (self *parser) statements() []*ast {
+	stmts := []*ast{}
 	next := self.lexer.peek()
 	for next.sym != "(EOF)" && next.sym != "}" {
-		stmts = append(stmts, self.statement())
+		stmt := self.statement()
+		if stmt.sym != "(EOF)" {
+			stmts = append(stmts, stmt)
+		}
 		next = self.lexer.peek()
 	}
 	return stmts
 }
 
-func (self *parser) block() *token {
+func (self *parser) block() *ast {
 	tok := self.lexer.next()
 	if tok.sym != "{" {
 		panic(fmt.Sprint("WAS LOOKING FOR BLOCK START", tok))
@@ -48,7 +51,7 @@ func (self *parser) block() *token {
 	return block
 }
 
-func (self *parser) statement() *token {
+func (self *parser) statement() *ast {
 	tok := self.lexer.peek()
 	if tok.std != nil {
 		tok = self.lexer.next()
@@ -59,7 +62,7 @@ func (self *parser) statement() *token {
 	return res
 }
 
-func (self *parser) advance(sym string) *token {
+func (self *parser) advance(sym string) *ast {
 	line := self.lexer.line
 	col := self.lexer.col
 	token := self.lexer.next()

@@ -30,6 +30,7 @@ const (
 	diceNotation
 	eofToken
 )
+
 var opa = map[string]struct {
 	prec   int
 	rAssoc bool
@@ -366,13 +367,11 @@ func (p *Parser) Parse() (*RollExpression, error) {
 			segmentHalf.Operator = "d"
 			segmentHalf.Number, _ = strconv.ParseInt(splitDice[0], 10, 0)
 			expression.SegmentHalfs = append(expression.SegmentHalfs, *segmentHalf)
-			insert(mathTree, segmentHalf.Number, segmentHalf.SegmentType, segmentHalf.Operator, segmentHalf.EvaluationPriority)
 			for i := 1; i < len(splitDice); i++ {
 				segmentHalf = new(SegmentHalf)
 				segmentHalf.Operator = "d"
 				segmentHalf.Number, _ = strconv.ParseInt(splitDice[i], 10, 0)
 				expression.SegmentHalfs = append(expression.SegmentHalfs, *segmentHalf)
-				insert(mathTree, segmentHalf.Number, segmentHalf.SegmentType, segmentHalf.Operator, segmentHalf.EvaluationPriority)
 			}
 			evalOrder++
 			tok, lit = p.scanIgnoreWhitespace()
@@ -399,7 +398,6 @@ func (p *Parser) Parse() (*RollExpression, error) {
 			}
 			segmentHalf.Number = foundNumber
 		}
-		insert(mathTree, segmentHalf.Number, segmentHalf.SegmentType, segmentHalf.Operator, segmentHalf.EvaluationPriority)
 		expression.SegmentHalfs = append(expression.SegmentHalfs, *segmentHalf)
 	}
 	//force dice rolls to highest priority

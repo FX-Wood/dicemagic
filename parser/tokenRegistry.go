@@ -1,11 +1,11 @@
 package main
 
 type tokenRegistry struct {
-	symTable map[string]*token
+	symTable map[string]*ast
 }
 
-func (self *tokenRegistry) token(sym string, value string, line int, col int) *token {
-	return &token{
+func (self *tokenRegistry) token(sym string, value string, line int, col int) *ast {
+	return &ast{
 		sym:          sym,
 		value:        value,
 		line:         line,
@@ -39,13 +39,13 @@ func (self *tokenRegistry) register(sym string, bp int, nud nudFn, led ledFn, st
 			val.bindingPower = bp
 		}
 	} else {
-		self.symTable[sym] = &token{bindingPower: bp, nud: nud, led: led, std: std}
+		self.symTable[sym] = &ast{bindingPower: bp, nud: nud, led: led, std: std}
 	}
 }
 
 // an infix token has two children, the exp on the left and the one that follows
 func (self *tokenRegistry) infix(sym string, bp int) {
-	self.register(sym, bp, nil, func(t *token, p *parser, left *token) *token {
+	self.register(sym, bp, nil, func(t *ast, p *parser, left *ast) *ast {
 		t.children = append(t.children, left)
 		t.children = append(t.children, p.expression(t.bindingPower))
 		return t
@@ -57,7 +57,7 @@ func (self *tokenRegistry) infixLed(sym string, bp int, led ledFn) {
 }
 
 func (self *tokenRegistry) infixRight(sym string, bp int) {
-	self.register(sym, bp, nil, func(t *token, p *parser, left *token) *token {
+	self.register(sym, bp, nil, func(t *ast, p *parser, left *ast) *ast {
 		t.children = append(t.children, left)
 		t.children = append(t.children, p.expression(t.bindingPower-1))
 		return t
@@ -70,7 +70,7 @@ func (self *tokenRegistry) infixRightLed(sym string, bp int, led ledFn) {
 
 // a prefix token has a single children, the expression that follows
 func (self *tokenRegistry) prefix(sym string) {
-	self.register(sym, 0, func(t *token, p *parser) *token {
+	self.register(sym, 0, func(t *ast, p *parser) *ast {
 		t.children = append(t.children, p.expression(100))
 		return t
 	}, nil, nil)
@@ -85,7 +85,7 @@ func (self *tokenRegistry) stmt(sym string, std stdFn) {
 }
 
 func (self *tokenRegistry) symbol(sym string) {
-	self.register(sym, 0, func(t *token, p *parser) *token { return t }, nil, nil)
+	self.register(sym, 0, func(t *ast, p *parser) *ast { return t }, nil, nil)
 }
 
 func (self *tokenRegistry) consumable(sym string) {

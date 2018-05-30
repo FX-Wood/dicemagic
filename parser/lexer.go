@@ -14,12 +14,12 @@ type lexer struct {
 	index  int
 	line   int
 	col    int
-	tok    *token
+	tok    *ast
 	cached bool
-	last   *token
+	last   *ast
 }
 
-func (self *lexer) nextString() *token {
+func (self *lexer) nextString() *ast {
 	var text bytes.Buffer
 	r, size := utf8.DecodeRuneInString(self.source[self.index:])
 	for size > 0 {
@@ -55,7 +55,7 @@ func (self *lexer) nextString() *token {
 	return self.tokReg.token("(STRING)", text.String(), self.line, self.col)
 }
 
-func (self *lexer) nextOperator() *token {
+func (self *lexer) nextOperator() *ast {
 	var text bytes.Buffer
 	r, size := utf8.DecodeRuneInString(self.source[self.index:])
 	col := self.col
@@ -67,9 +67,9 @@ func (self *lexer) nextOperator() *token {
 	r, size = utf8.DecodeRuneInString(self.source[self.index:])
 	if size > 0 && isOperatorChar(r) {
 		twoChar.WriteRune(r)
-		if self.tokReg.defined(strings.ToLower(twoChar.String())) {
+		if self.tokReg.defined(twoChar.String()) {
 			self.consumeRune(&text, r, size)
-			textStr := strings.ToLower(text.String())
+			textStr := text.String()
 			return self.tokReg.token(textStr, textStr, self.line, col)
 		}
 	}
@@ -82,7 +82,7 @@ func (self *lexer) nextOperator() *token {
 	return self.tokReg.token(textStr, textStr, self.line, col)
 }
 
-func (self *lexer) nextIdent() *token {
+func (self *lexer) nextIdent() *ast {
 	var text bytes.Buffer
 	col := self.col
 	r, size := utf8.DecodeRuneInString(self.source[self.index:])
@@ -107,7 +107,7 @@ func (self *lexer) nextIdent() *token {
 	}
 	return self.tokReg.token("(IDENT)", symbol, self.line, col)
 }
-func (self *lexer) next() *token {
+func (self *lexer) next() *ast {
 	// invalidate peekable cache
 	self.cached = false
 
@@ -203,7 +203,7 @@ func (self *lexer) consumeRune(text *bytes.Buffer, r rune, size int) {
 	self.index += size
 }
 
-func (self *lexer) peek() *token {
+func (self *lexer) peek() *ast {
 	if self.cached {
 		return self.tok
 	}
@@ -230,7 +230,7 @@ func tdopLexer(source string) *lexer {
 }
 
 func getTokenRegistry() *tokenRegistry {
-	t := &tokenRegistry{symTable: make(map[string]*token)}
+	t := &tokenRegistry{symTable: make(map[string]*ast)}
 
 	t.symbol("(NUMBER)")
 	t.symbol("(STRING)")
@@ -256,9 +256,26 @@ func getTokenRegistry() *tokenRegistry {
 
 	t.infix("*", 60)
 	t.infix("/", 60)
-	t.infix("d", 70)
+	t.infix("^", 70)
+	t.infix("d", 80)
+	t.infixLed("-L", 55, func(t *ast, p *parser, left *ast) *ast {
+		next := p.lexer.peek()
+		if next.sym == "(NUMBER)" {
+			t.children = append(t.children, p.expression(t.bindingPower))
+		}
+		left.children = append(left.children, t)
+		return left
+	})
+	t.infixLed("-H", 55, func(t *ast, p *parser, left *ast) *ast {
+		next := p.lexer.peek()
+		if next.sym == "(NUMBER)" {
+			t.children = append(t.children, p.expression(t.bindingPower))
+		}
+		left.children = append(left.children, t)
+		return left
+	})
 
-	t.infix("mod", 65)
+	t.infix("mod", 95)
 
 	t.infix("<", 30)
 	t.infix(">", 30)
@@ -268,7 +285,7 @@ func getTokenRegistry() *tokenRegistry {
 
 	t.symbol("(IDENT)")
 
-	t.infixLed("if", 20, func(token *token, p *parser, left *token) *token {
+	t.infixLed("if", 20, func(token *ast, p *parser, left *ast) *ast {
 		cond := p.expression(0)
 		token.children = append(token.children, cond)
 		p.advance("else")
@@ -277,7 +294,7 @@ func getTokenRegistry() *tokenRegistry {
 		return token
 	})
 
-	t.infixLed("(", 90, func(token *token, p *parser, left *token) *token {
+	t.infixLed("(", 90, func(token *ast, p *parser, left *ast) *ast {
 		if left.sym != "(IDENT)" && left.sym != "[" && left.sym != "(" && left.sym != "->" {
 			panic(fmt.Sprint("BAD FUNC CALL LEFT OPERAND", left))
 		}
@@ -300,7 +317,7 @@ func getTokenRegistry() *tokenRegistry {
 		return token
 	})
 
-	t.infixLed("[", 80, func(token *token, p *parser, left *token) *token {
+	t.infixLed("[", 80, func(token *ast, p *parser, left *ast) *ast {
 		if left.sym != "(IDENT)" && left.sym != "[" && left.sym != "(" {
 			panic(fmt.Sprint("BAD ARRAY LEFT OPERAND", left))
 		}
@@ -330,7 +347,7 @@ func getTokenRegistry() *tokenRegistry {
 	t.infixRight("+=", 10)
 	t.infixRight("-=", 10)
 
-	t.infixRightLed("->", 10, func(token *token, p *parser, left *token) *token {
+	t.infixRightLed("->", 10, func(token *ast, p *parser, left *ast) *ast {
 		if left.sym != "()" && left.sym != "(IDENT)" {
 			panic(fmt.Sprint("INVALID FUNC DECLARATION TUPLE", left))
 		}
@@ -358,7 +375,7 @@ func getTokenRegistry() *tokenRegistry {
 	t.prefix("-")
 	t.prefix("not")
 
-	t.prefixNud("(", func(t *token, p *parser) *token {
+	t.prefixNud("(", func(t *ast, p *parser) *ast {
 		comma := false
 		if p.lexer.peek().sym != ")" {
 			for {
@@ -383,7 +400,7 @@ func getTokenRegistry() *tokenRegistry {
 		}
 	})
 
-	t.prefixNud("[", func(t *token, p *parser) *token {
+	t.prefixNud("[", func(t *ast, p *parser) *ast {
 		if p.lexer.peek().sym != "]" {
 			for {
 				if p.lexer.peek().sym == "]" {
@@ -402,7 +419,7 @@ func getTokenRegistry() *tokenRegistry {
 		return t
 	})
 
-	t.stmt("if", func(t *token, p *parser) *token {
+	t.stmt("if", func(t *ast, p *parser) *ast {
 		t.children = append(t.children, p.expression(0))
 		t.children = append(t.children, p.block())
 		next := p.lexer.peek()
@@ -418,32 +435,54 @@ func getTokenRegistry() *tokenRegistry {
 		return t
 	})
 
-	t.stmt("(IDENT)", func(t *token, p *parser) *token {
+	// t.stmt("-L", func(t *ast, p *parser) *ast {
+	// 	t.children = append(t.children, p.statements()...)
+	// 	return t
+	// })
+	// t.stmt("-H", func(t *ast, p *parser) *ast {
+	// 	t.children = append(t.children, p.statements()...)
+	// 	return t
+	// })
+
+	t.stmt("(IDENT)", func(t *ast, p *parser) *ast {
 		t.children = append(t.children, p.statements()...)
 		return t
+	})
+	t.stmt("(NEWLINE)", func(t *ast, p *parser) *ast {
+		next := p.lexer.peek()
+		for next.sym == "(NEWLINE)" {
+			p.advance("(NEWLINE)")
+			next = p.lexer.peek()
+		}
+
+		if next.sym == "(EOF)" {
+			p.advance("(EOF)")
+			return p.lexer.tokReg.token("(EOF)", "EOF", p.lexer.line, p.lexer.col)
+		}
+		return p.statement()
 	})
 	// t.prefixNud("roll", func(t *token, p *parser) *token {
 	// 	t.children = append(t.children, p.statement())
 	// 	t.children = append(t.children, p.expression(0))
 	// 	return t
 	// })
-	t.stmt("while", func(t *token, p *parser) *token {
+	t.stmt("while", func(t *ast, p *parser) *ast {
 		t.children = append(t.children, p.expression(0))
 		t.children = append(t.children, p.block())
 		return t
 	})
 
-	t.stmt("roll", func(t *token, p *parser) *token {
+	t.stmt("roll", func(t *ast, p *parser) *ast {
 		t.children = append(t.children, p.statement())
 		return t
 	})
 
-	t.stmt("{", func(t *token, p *parser) *token {
+	t.stmt("{", func(t *ast, p *parser) *ast {
 		t.children = append(t.children, p.statements()...)
 		p.advance("}")
 		return t
 	})
-	t.stmt("return", func(t *token, p *parser) *token {
+	t.stmt("return", func(t *ast, p *parser) *ast {
 		if p.lexer.peek().sym != ";" {
 			t.children = append(t.children, p.expression(0))
 		}
@@ -462,7 +501,7 @@ func isIdentChar(r rune) bool {
 }
 
 func isOperatorChar(r rune) bool {
-	operators := "!@#$%^*()-+=/?.,:;\"|/{}[]><dD"
+	operators := "!@#$%^*()-+=/?.,:;\"|/{}[]><dDLH"
 	for _, c := range operators {
 		if c == r {
 			return true

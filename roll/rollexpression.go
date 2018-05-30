@@ -2,7 +2,6 @@ package roll
 
 import (
 	"bytes"
-	"errors"
 	"fmt"
 	"sort"
 	"strconv"
@@ -30,56 +29,6 @@ type MathNode struct {
 type MathData struct {
 	SegmentType string
 	Value       int64
-}
-
-func (t *MathTree) Insert(priority int, data MathData) error {
-	if t.Root == nil {
-		t.Root = &MathNode{Priority: priority, Data: data}
-		return nil
-	}
-	return t.Root.Insert(priority, data)
-}
-func (n *MathNode) Insert(priority int, data MathData) error {
-	if n == nil {
-		return errors.New("Cannot insert a value into a nil tree")
-	}
-	switch {
-	case priority == n.Priority:
-		if n.Left == nil {
-			n.Left = &MathNode{Priority: priority, Data: data}
-			return nil
-		} else if n.Right == nil {
-			n.Right = &MathNode{Priority: priority, Data: data}
-			return nil
-		} else {
-			return n.Left.Insert(priority-1, data)
-		}
-	case priority < n.Priority:
-		if n.Left == nil {
-			n.Left = &MathNode{Priority: priority, Data: data}
-			return nil
-		}
-		return n.Left.Insert(priority, data)
-	case priority > n.Priority:
-		if n.Right == nil {
-			n.Right = &MathNode{Priority: priority, Data: data}
-			return nil
-		}
-		return n.Right.Insert(priority, data)
-	}
-	return nil
-}
-
-func insert(t *MathTree, value int64, segmentType string, operator string, priority int) *MathTree {
-	if t == nil {
-		return &MathTree{Left: nil, Right: nil, SegmentType: segmentType, Value: value, Operator: operator, Priority: priority}
-	}
-	if priority < t.Priority {
-		t.Left = insert(t.Left, value, segmentType, operator, priority)
-		return t
-	}
-	t.Right = insert(t.Right, value, segmentType, operator, priority)
-	return t
 }
 
 //SegmentHalf is half of a mathmatical expression along it's its evaluation priority
@@ -245,28 +194,28 @@ func insertAtLocation(segment []SegmentHalf, segmentToInsert SegmentHalf, locati
 	return segment
 }
 
-func doMath(leftMod SegmentHalf, rightmod SegmentHalf) (SegmentHalf, error) {
-	m := SegmentHalf{}
-	switch rightmod.Operator {
-	case "*":
-		m.Number = leftMod.Number * rightmod.Number
-	case "/":
-		if rightmod.Number == 0 {
-			return m, fmt.Errorf("Don't make me break the universe.")
-		}
-		m.Number = leftMod.Number / rightmod.Number
-	case "+":
-		m.Number = leftMod.Number + rightmod.Number
-	case "-":
-		m.Number = leftMod.Number - rightmod.Number
-	case "d":
-		_, num, err := roll(leftMod.Number, rightmod.Number)
-		m.Number = num
-		if err != nil {
-			return m, err
-		}
-	}
-	m.Operator = leftMod.Operator
-	m.EvaluationPriority = leftMod.EvaluationPriority
-	return m, nil
-}
+// func doMath(leftMod SegmentHalf, rightmod SegmentHalf) (SegmentHalf, error) {
+// 	m := SegmentHalf{}
+// 	switch rightmod.Operator {
+// 	case "*":
+// 		m.Number = leftMod.Number * rightmod.Number
+// 	case "/":
+// 		if rightmod.Number == 0 {
+// 			return m, fmt.Errorf("Don't make me break the universe.")
+// 		}
+// 		m.Number = leftMod.Number / rightmod.Number
+// 	case "+":
+// 		m.Number = leftMod.Number + rightmod.Number
+// 	case "-":
+// 		m.Number = leftMod.Number - rightmod.Number
+// 	case "d":
+// 		_, num, err := roll(leftMod.Number, rightmod.Number, )
+// 		m.Number = num
+// 		if err != nil {
+// 			return m, err
+// 		}
+// 	}
+// 	m.Operator = leftMod.Operator
+// 	m.EvaluationPriority = leftMod.EvaluationPriority
+// 	return m, nil
+// }
