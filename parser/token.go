@@ -16,4 +16,12 @@ type ast struct {
 	led          ledFn
 	std          stdFn
 	children     []*ast
+	Dice         []Dice
+}
+
+func (t *ast) IsLeaf() bool {
+	if len(t.children) == 0 {
+		return true
+	}
+	return false
 }

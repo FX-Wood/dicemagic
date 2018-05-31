@@ -283,7 +283,10 @@ func getTokenRegistry() *tokenRegistry {
 	t.infix(">=", 30)
 	t.infix("==", 30)
 
-	t.symbol("(IDENT)")
+	t.infixLed("(IDENT)", 100, func(t *ast, p *parser, left *ast) *ast {
+		left.children = append(left.children, t)
+		return left
+	})
 
 	t.infixLed("if", 20, func(token *ast, p *parser, left *ast) *ast {
 		cond := p.expression(0)
@@ -341,6 +344,7 @@ func getTokenRegistry() *tokenRegistry {
 	})
 
 	t.infixRight("and", 25)
+	t.infixRight(",", 25)
 	t.infixRight("or", 25)
 
 	t.infixRight("=", 10)
