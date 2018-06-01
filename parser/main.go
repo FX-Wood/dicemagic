@@ -168,36 +168,60 @@ func printAST(t *ast, identation int) {
 }
 func (t *ast) preformArithmitic(ds *DiceSet, op string) (float64, *DiceSet, error) {
 	//arithmitic is always binary
-	var x float64
 	//...except for the "-" unary operator
 	if len(t.children) < 2 {
 
 	}
 	diceCount := len(ds.Dice)
+	var nums []float64
+	ds.colorDepth++
 	for _, c := range t.children {
-		ds.colorDepth++
-		x, ds, err := t.children[0].eval(ds)
-		if err != nil {
-			return 0, ds, err
+		switch c.sym {
+		case "(NUMBER)":
+			x, ds, err := c.eval(ds)
+			if err != nil {
+				return 0, ds, err
+			}
+			nums := append(nums, x)
+		case "(IDENT)":
+			_, ds, err := c.eval(ds)
+			if err != nil {
+				return 0, ds, err
+			}
 		}
-		y, ds, err := t.children[1].eval(ds)
-		if err != nil {
-			return 0, ds, err
-		}
-		ds.colorDepth--
 	}
+	ds.colorDepth--
 	newDice := len(ds.Dice) - diceCount
+	var x float64
 	switch op {
 	case "+":
-		x += y
+		for _, y := range nums {
+			x += y
+		}
 	case "-":
-		x -= y
+		if len(nums) < 2 {
+			x = -nums[0]
+		} else {
+			x = nums[0]
+			for i := 1; i < len(nums); i++ {
+				x -= nums[i]
+			}
+		}
 	case "*":
-		x *= y
+		x = nums[0]
+		for i := 1; i < len(nums); i++ {
+			x *= nums[i]
+		}
 	case "/":
-		x /= y
+		x = nums[0]
+		for i := 1; i < len(nums); i++ {
+			x /= nums[i]
+		}
 	case "^":
-		x = math.Pow(x, y)
+		x = nums[0]
+		for i := 1; i < len(nums); i++ {
+			x = math.Pow(x, nums[i])
+		}
 	default:
 		return 0, ds, fmt.Errorf("invalid operator: %s", op)
 	}
