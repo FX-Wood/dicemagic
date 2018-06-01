@@ -24,21 +24,26 @@ func main() {
 		fmt.Println(source)
 		fmt.Println("----------")
 		for _, stmt := range stmts {
-			v, ds := stmt.GetDiceSet()
-			//printAST(stmt, 0)
+			printAST(stmt, 0)
+			fmt.Println()
+			v, ds, err := stmt.GetDiceSet()
+			if err != nil {
+				fmt.Printf("Could not parse input: %v\n", err)
+				return
+			}
 			for _, v := range ds.Dice {
 				fmt.Printf("%+v\n", v)
 			}
 			fmt.Printf("for a total of: %+v\n", v)
+			fmt.Printf("map: %+v\n", ds.ColorTotals)
 			fmt.Println("----------")
 		}
 	}
 }
 
-func (t *ast) GetDiceSet() (float64, DiceSet) {
-	v, ret, _ := t.eval(&DiceSet{})
-	ret.Dice = append(ret.Dice, t.Dice...)
-	return v, *ret
+func (t *ast) GetDiceSet() (float64, DiceSet, error) {
+	v, ret, err := t.eval(&DiceSet{})
+	return v, *ret, err
 }
 
 func (t *ast) eval(ds *DiceSet) (float64, *DiceSet, error) {
@@ -46,60 +51,65 @@ func (t *ast) eval(ds *DiceSet) (float64, *DiceSet, error) {
 	case "(NUMBER)":
 		i, _ := strconv.ParseFloat(t.value, 64)
 		if len(t.children) > 0 {
+			//grab any color below, get it on ds
 			t.children[0].eval(ds)
 		}
 		return i, ds, nil
-	case "d":
-		dice := Dice{}
-		//d is always binary
-		l, _, err := t.children[0].eval(ds)
-		dice.Count = int64(l)
-		if err != nil {
-			return 0, nil, err
-		}
-		r, _, err := t.children[1].eval(ds)
-		dice.Sides = int64(r)
-		if err != nil {
-			return 0, nil, err
-		}
-		// if K or L
-		if len(t.children) > 2 {
-			var x float64
-			var intx int64
-			if len(t.children[2].children) != 0 {
-				x, _, err = t.children[2].eval(ds)
+	case "-H", "-L":
+		var intx int64
+		var e float64
+		if len(t.children) != 0 {
+			var (
+				err error
+				x   float64
+			)
+			for _, c := range t.children {
+				x, ds, err = c.eval(ds)
 				if err != nil {
 					return 0, ds, err
 				}
-				intx = int64(x)
-			} else {
-				intx = dice.Count - 1
-			}
-			switch s := t.children[2].sym; s {
-			case "-H":
-				dice.H = intx
-			case "-L":
-				dice.L = intx
-			default:
-				return 0, ds, fmt.Errorf("unsupported dice modifier found: \"%s\"", s)
+				e += x
 			}
 		}
+		intx = int64(math.Max(1, e))
+		switch t.sym {
+		case "-H":
+			ds.h = intx
+		case "-L":
+			ds.l = intx
+		}
+		return 0, ds, nil
+	case "d":
+		dice := Dice{}
+		//sub d's don't get added to totals
+		//ds.Pause()
+		//ds.ColorSetDepth++
+		var nums []int64
+		for i := 0; i < len(t.children); i++ {
+			var num float64
+			var err error
+			num, ds, err = t.children[i].eval(ds)
+			if err != nil {
+				return 0, nil, err
+			}
+			if num != 0 {
+				nums = append(nums, int64(num))
+			}
+		}
+		//ds.UnPause()
+		//ds.ColorSetDepth--
+		dice.Count = nums[0]
+		dice.Sides = nums[1]
 		//actually roll dice here
-		res, err := dice.Roll()
-		ds.Add(dice)
-		ds.color = ""
+		res, err := ds.PushAndRoll(dice)
 		return float64(res), ds, err
-	case "+", "-", "*", "/", "^", "-H", "-L":
+	case "+", "-", "*", "/", "^":
 		x, ds, err := t.preformArithmitic(ds, t.sym)
-
 		if err != nil {
 			return 0, ds, err
 		}
-		if len(ds.Dice) > 0 {
-			ds.Dice[len(ds.Dice)-1].Color = ds.color
-		}
 		return x, ds, nil
-	case "{", "and", ",":
+	case "{", "roll":
 		var x float64
 		for _, c := range t.children {
 			y, ds, err := c.eval(ds)
@@ -110,20 +120,10 @@ func (t *ast) eval(ds *DiceSet) (float64, *DiceSet, error) {
 		}
 		return x, ds, nil
 	case "(IDENT)":
-		ds.color = t.value
+		ds.PushColor(t.value)
 		return 0, ds, nil
-	case "roll":
-		var x float64
-		for _, c := range t.children {
-			y, ds, err := c.eval(ds)
-			if err != nil {
-				return 0, ds, err
-			}
-			x += y
-		}
-		return x, ds, nil
 	case "if":
-		res, ds, err := t.evaluateBoolean(ds)
+		res, ds, err := t.children[0].evaluateBoolean(ds)
 		if err != nil {
 			return 0, ds, err
 		}
@@ -138,13 +138,12 @@ func (t *ast) eval(ds *DiceSet) (float64, *DiceSet, error) {
 			c = t.children[2]
 		}
 		var x float64
-		for i := 0; i < len(c.children); i++ {
-			y, ds, err := c.children[i].eval(ds)
-			if err != nil {
-				return 0, ds, err
-			}
-			x += y
+		//Evaluate chosen child
+		y, ds, err := c.eval(ds)
+		if err != nil {
+			return 0, ds, err
 		}
+		x += y
 		return x, ds, nil
 	default:
 		return 0, ds, fmt.Errorf("Unsupported symbol: %s", t.sym)
@@ -168,230 +167,71 @@ func printAST(t *ast, identation int) {
 	fmt.Print(")")
 }
 func (t *ast) preformArithmitic(ds *DiceSet, op string) (float64, *DiceSet, error) {
+	//arithmitic is always binary
 	var x float64
+	diceCount := len(ds.Dice)
+
+	ds.ColorSetDepth++
 	x, ds, err := t.children[0].eval(ds)
 	if err != nil {
 		return 0, ds, err
 	}
-	for i := 1; i < len(t.children); i++ {
-		y, ds, err := t.children[i].eval(ds)
-		if err != nil {
-			return 0, ds, err
-		}
-		switch op {
-		case "+", "-K", "-L":
-			x += y
-		case "-":
-			x -= y
-		case "*":
-			x *= y
-		case "/":
-			x /= y
-		case "^":
-			x = math.Pow(x, y)
-		default:
-			return 0, ds, fmt.Errorf("invalid operator: %s", op)
-		}
+	y, ds, err := t.children[1].eval(ds)
+	if err != nil {
+		return 0, ds, err
 	}
+	ds.ColorSetDepth--
+	newDice := len(ds.Dice) - diceCount
+	switch op {
+	case "+":
+		x += y
+	case "-":
+		x -= y
+	case "*":
+		x *= y
+	case "/":
+		x /= y
+	case "^":
+		x = math.Pow(x, y)
+	default:
+		return 0, ds, fmt.Errorf("invalid operator: %s", op)
+	}
+	if len(ds.colors) > 1 {
+		return 0, ds, fmt.Errorf("cannot preform aritimitic on different color dice, try \",\" or \"and\" instead")
+	}
+	color := ds.PopColor()
+	for i := 0; i < newDice; i++ {
+		ds.Top(i).Color = color
+	}
+	ds.AddToColor(color, x)
 	return x, ds, nil
 }
 
 func (t *ast) evaluateBoolean(ds *DiceSet) (bool, *DiceSet, error) {
+	left, ds, err := t.children[0].eval(ds)
+	if err != nil {
+		return false, ds, err
+	}
+	right, ds, err := t.children[1].eval(ds)
+	if err != nil {
+		return false, ds, err
+	}
 	switch t.sym {
 	case ">":
-		l, ds, err := t.children[0].eval(ds)
-		if err != nil {
-			return false, ds, err
-		}
-		r, ds, err := t.children[1].eval(ds)
-		if err != nil {
-			return false, ds, err
-		}
-		if l > r {
-			return false, ds, nil
-		}
-		return false, ds, nil
+		return left > right, ds, nil
+	case "<":
+		return left < right, ds, nil
+	case "<=":
+		return left <= right, ds, nil
+	case ">=":
+		return left >= right, ds, nil
+	case "==":
+		return left == right, ds, nil
+	case "!=":
+		return left != right, ds, nil
 	}
 	return false, ds, fmt.Errorf("Bad bool")
 }
-
-// func sumMaps(maps ...map[string]float64) map[string]float64 {
-// 	ret := make(map[string]float64)
-// 	for _, m := range maps {
-// 		for k, v := range m {
-// 			ret[k] += v
-// 		}
-// 	}
-// 	return ret
-// }
-
-// func Results(t *ast) (DiceSet, error) {
-// 	ret := DiceSet{}
-
-// switch sym := t.sym; sym {
-// case "and", ",", "roll", "{":
-// 	for _, c := range t.children {
-// 		r, err := Results(c)
-// 		if err != nil {
-// 			return ret, err
-// 		}
-// 		ret.Dice = append(ret.Dice, r.Dice...)
-// 	}
-// 	return ret, nil
-// case "if":
-// 	res, err := EvaluateBoolean(t.children[0])
-// 	if err != nil {
-// 		return ret, err
-// 	}
-// 	fmt.Print(res, " ")
-// 	var c *ast
-// 	if res {
-// 		c = t.children[1]
-// 	} else {
-// 		if len(t.children) < 3 {
-// 			return ret, nil
-// 		}
-// 		c = t.children[2]
-// 	}
-// 	for i := 0; i < len(c.children); i++ {
-// 		r, err := Results(c.children[i])
-// 		if err != nil {
-// 			return ret, err
-// 		}
-// 		ret.Dice = append(ret.Dice, r.Dice...)
-// 	}
-// 	return ret, nil
-// case "+", "-", "*", "/", "^", "-H", "-L", "(NUMBER)", "(IDENT)", "d":
-// 	r, b, _, _, err := EvaluateExpression(t)
-// 	if err != nil {
-// 		return ret, err
-// 	}
-// 	if b {
-// 		ret.Dice = append(ret.Dice, r)
-// 	}
-// 	return ret, nil
-// default:
-// 	return ret, fmt.Errorf("Unsupported symbol: %s", t.sym)
-// }
-// }
-// func EvaluateExpression(t *ast) (Dice, bool, float64, string, error) {
-// 	var (
-// 		ret   float64
-// 		color string
-// 		err   error
-// 		d     Dice
-// 	)
-// 	switch t.sym {
-// 	case "(NUMBER)":
-// 		ret, err := strconv.ParseFloat(t.value, 64)
-// 		if err != nil {
-// 			return d, false, 0, "", err
-// 		}
-// 		if len(t.children) > 0 {
-// 			_, _, _, color, err = EvaluateExpression(t.children[0])
-// 			if err != nil {
-// 				return d, false, 0, "", err
-// 			}
-// 		}
-// 		return d, false, ret, color, nil
-
-// 	case "(IDENT)":
-// 		return d, false, 0, t.value, nil
-// 	case "+", "-", "*", "/", "^", "-H", "-L":
-// 		ret, color, err = preformArithmitic(t, t.sym)
-// 		if err != nil {
-// 			return d, false, 0, "", err
-// 		}
-// 		return d, false, ret, color, nil
-// 	case "d":
-// 		d, err = EvaluateDice(t)
-// 		if err != nil {
-// 			return d, false, 0, "", err
-// 		}
-// 		return d, true, float64(d.resultTotal), d.Color, nil
-// 	}
-// 	return d, false, ret, color, fmt.Errorf("Invalid Expression: %s:%s", t.sym, t.value)
-// }
-
-// func EvaluateDice(t *ast) (Dice, error) {
-// 	var (
-// 		color  string
-// 		lColor string
-// 		rColor string
-// 		err    error
-// 		left   float64
-// 		right  float64
-// 	)
-// 	dice := Dice{}
-// 	if len(t.children) > 3 {
-// 		return dice, fmt.Errorf("dice has more than 3 children")
-// 	}
-// 	_, _, left, lColor, err = EvaluateExpression(t.children[0])
-// 	dice.Count = int64(left)
-// 	if err != nil {
-// 		return dice, err
-// 	}
-// 	_, _, right, rColor, err = EvaluateExpression(t.children[1])
-// 	dice.Sides = int64(right)
-// 	if err != nil {
-// 		return dice, err
-// 	}
-// 	color = rColor + lColor
-// 	dice.Color = color
-// 	// if K or L
-// 	if len(t.children) > 2 {
-// 		var x float64
-// 		var intx int64
-// 		if len(t.children[2].children) != 0 {
-// 			_, _, x, _, err = EvaluateExpression(t.children[2])
-// 			if err != nil {
-// 				return dice, err
-// 			}
-// 			intx = int64(x)
-// 		} else {
-// 			intx = dice.Count - 1
-// 		}
-// 		switch s := t.children[2].sym; s {
-// 		case "-H":
-// 			dice.H = intx
-// 		case "-L":
-// 			dice.L = intx
-// 		default:
-// 			return dice, fmt.Errorf("unsupported dice modifier found: \"%s\"", s)
-// 		}
-// 	}
-// 	//actually roll dice here
-// 	_, err = dice.Roll()
-// 	fmt.Printf("%+v\n", dice)
-// 	if err != nil {
-// 		return dice, err
-// 	}
-// 	return dice, err
-// }
-
-// func EvaluateBoolean(t *ast) (bool, error) {
-// 	_, _, l, _, err := EvaluateExpression(t.children[0])
-// 	if err != nil {
-// 		return false, err
-// 	}
-// 	_, _, r, _, err := EvaluateExpression(t.children[1])
-// 	if err != nil {
-// 		return false, err
-// 	}
-// 	switch t.sym {
-// 	case ">":
-// 		if l > r {
-// 			return true, nil
-// 		}
-// 		return false, nil
-// 	case "<":
-// 		if l < r {
-// 			return true, nil
-// 		}
-// 		return false, nil
-// 	}
-// 	return false, fmt.Errorf("Bad boolean operator: %s", t.sym)
-// }
 
 type Dice struct {
 	Count       int64
@@ -403,36 +243,90 @@ type Dice struct {
 	H           int64
 	L           int64
 	Color       string
-	Expression  *ast
 }
 type DiceSet struct {
-	Dice            []Dice
-	ResultTotals    []int64
-	DiceType        string
-	Min             int64
-	Max             int64
-	color           string
-	UnaryExpression float64
+	Dice          []Dice
+	ColorTotals   map[string]float64
+	h             int64
+	l             int64
+	colors        []string
+	ColorSetDepth int
+	paused        bool
 }
 
-func (d *DiceSet) Add(dice Dice) {
-	dice.Color = d.color
+//Pause pauses the collection of ColorTotals
+func (d *DiceSet) Pause() {
+	d.paused = true
+}
+
+//UnPause resumes the collection of ColorTotals
+func (d *DiceSet) UnPause() {
+	d.paused = false
+}
+
+//PushAndRoll adds a dice roll to the "stack" applying any values from the set
+func (d *DiceSet) PushAndRoll(dice Dice) (int64, error) {
+	if d.ColorSetDepth == 0 {
+		dice.Color = d.PopColor()
+	} else {
+		dice.Color = d.PeekColor()
+	}
+	dice.H = d.h
+	dice.L = d.l
+	d.l = 0
+	d.h = 0
+	res, err := dice.Roll()
+	if err != nil {
+		return 0, err
+	}
 	d.Dice = append(d.Dice, dice)
+	d.AddToColor(dice.Color, float64(res))
+	return res, nil
 }
 
-// func (d *DiceSet) Roll() ([]int64, error) {
-// 	d.Min, d.Max = 0, 0
-// 	for _, ds := range d.Dice {
-// 		result, err := ds.Roll()
-// 		if err != nil {
-// 			return nil, err
-// 		}
-// 		d.Min += ds.Count
-// 		d.Max += (ds.Count - (ds.H + ds.L)) * ds.Sides
-// 		d.ResultTotals = append(d.ResultTotals, result)
-// 	}
-// 	return d.ResultTotals, nil
-// }
+//PushColor pushes a color to the "stack"
+func (d *DiceSet) PushColor(color string) {
+	d.colors = append(d.colors, color)
+}
+
+//PeekColor returns the most recently added color from the "stack"
+func (d *DiceSet) PeekColor() string {
+	if len(d.colors) > 0 {
+		color := d.colors[len(d.colors)-1]
+		return color
+	}
+	return ""
+}
+
+//PopColor pops a color from the "stack"
+func (d *DiceSet) PopColor() string {
+
+	if len(d.colors) > 0 {
+		color := d.colors[len(d.colors)-1]
+		d.colors = d.colors[:len(d.colors)-1]
+		return color
+	}
+	return ""
+}
+
+//Top returns a pointer to the most recently added dice roll
+func (d *DiceSet) Top(loc int) *Dice {
+	if len(d.Dice) > 0 {
+		return &d.Dice[len(d.Dice)-loc-1]
+	}
+	return nil
+}
+
+//AddToColor increments the total result for a given color
+func (d *DiceSet) AddToColor(color string, value float64) {
+	if d.ColorTotals == nil {
+		d.ColorTotals = make(map[string]float64)
+	}
+	if d.ColorSetDepth == 0 && !d.paused {
+		d.ColorTotals[color] += value
+	}
+}
+
 func (d *Dice) Roll() (int64, error) {
 	if d.resultTotal != 0 {
 		return d.resultTotal, nil
@@ -484,22 +378,16 @@ func roll(numberOfDice int64, sides int64, H int64, L int64) ([]int64, int64, er
 		}
 		sort.Slice(faces, func(i, j int) bool { return faces[i] < faces[j] })
 		if H > 0 {
-			f := faces[int64(len(faces))-H:]
-			total = sumFaces(f)
+			keptFaces := faces[:int64(len(faces))-H]
+			total = sumInt64(keptFaces...)
 		} else if L > 0 {
-			f := faces[:L]
-			total = sumFaces(f)
+			keptFaces := faces[L:]
+			total = sumInt64(keptFaces...)
 		}
 		return faces, total, nil
 	}
 }
-func sumFaces(faces []int64) int64 {
-	var total int64
-	for _, f := range faces {
-		total += f
-	}
-	return total
-}
+
 func generateRandomInt(min int64, max int64) (int64, error) {
 	if max <= 0 || min < 0 {
 		err := fmt.Errorf("Cannot make a random int of size zero")
@@ -519,7 +407,7 @@ func generateRandomInt(min int64, max int64) (int64, error) {
 	return n + int64(min), nil
 }
 
-func diceProbability(numberOfDice int64, sides int64, target int64) float64 {
+func diceProbability(numberOfDice int64, sides int64, target int64, H int64, L int64) float64 {
 	rollAmount := math.Pow(float64(sides), float64(numberOfDice))
 	targetAmount := float64(0)
 	var possibilities []int64
@@ -529,12 +417,18 @@ func diceProbability(numberOfDice int64, sides int64, target int64) float64 {
 	c := make(chan []int64)
 	go generateProducts(c, possibilities, numberOfDice)
 	for product := range c {
+		if H > 0 {
+			sort.Slice(product, func(i, j int) bool { return product[i] < product[j] })
+			product = product[:int64(len(product))-H]
+		} else if L > 0 {
+			sort.Slice(product, func(i, j int) bool { return product[i] < product[j] })
+			product = product[L:]
+		}
 		if sumInt64(product...) == target {
 			targetAmount++
 		}
 	}
-	p := (targetAmount / rollAmount)
-	return p
+	return (targetAmount / rollAmount)
 }
 
 func generateProducts(c chan []int64, possibilities []int64, numberOfDice int64) {

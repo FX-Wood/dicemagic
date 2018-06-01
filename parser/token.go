@@ -16,7 +16,6 @@ type ast struct {
 	led          ledFn
 	std          stdFn
 	children     []*ast
-	Dice         []Dice
 }
 
 func (t *ast) IsLeaf() bool {

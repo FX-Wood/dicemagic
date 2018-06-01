@@ -243,6 +243,7 @@ func getTokenRegistry() *tokenRegistry {
 	t.consumable(")")
 	t.consumable("]")
 	t.consumable(",")
+	t.consumable("and")
 	t.consumable("else")
 
 	t.consumable("(EOF)")
@@ -258,7 +259,7 @@ func getTokenRegistry() *tokenRegistry {
 	t.infix("/", 60)
 	t.infix("^", 70)
 	t.infix("d", 80)
-	t.infixLed("-L", 55, func(t *ast, p *parser, left *ast) *ast {
+	t.infixLed("-L", 30, func(t *ast, p *parser, left *ast) *ast {
 		next := p.lexer.peek()
 		if next.sym == "(NUMBER)" {
 			t.children = append(t.children, p.expression(t.bindingPower))
@@ -266,7 +267,7 @@ func getTokenRegistry() *tokenRegistry {
 		left.children = append(left.children, t)
 		return left
 	})
-	t.infixLed("-H", 55, func(t *ast, p *parser, left *ast) *ast {
+	t.infixLed("-H", 30, func(t *ast, p *parser, left *ast) *ast {
 		next := p.lexer.peek()
 		if next.sym == "(NUMBER)" {
 			t.children = append(t.children, p.expression(t.bindingPower))
@@ -282,8 +283,10 @@ func getTokenRegistry() *tokenRegistry {
 	t.infix("<=", 30)
 	t.infix(">=", 30)
 	t.infix("==", 30)
+	t.infix("!=", 30)
 
 	t.infixLed("(IDENT)", 100, func(t *ast, p *parser, left *ast) *ast {
+		t.value = strings.Title(t.value)
 		left.children = append(left.children, t)
 		return left
 	})
@@ -320,64 +323,15 @@ func getTokenRegistry() *tokenRegistry {
 		return token
 	})
 
-	t.infixLed("[", 80, func(token *ast, p *parser, left *ast) *ast {
-		if left.sym != "(IDENT)" && left.sym != "[" && left.sym != "(" {
-			panic(fmt.Sprint("BAD ARRAY LEFT OPERAND", left))
-		}
-		token.children = append(token.children, left)
-		t := p.lexer.peek()
-		if t.sym != "]" {
-			for {
-				exp := p.expression(0)
-				token.children = append(token.children, exp)
-				token := p.lexer.peek()
-				if token.sym != "," {
-					break
-				}
-				p.advance(",")
-			}
-			p.advance("]")
-		} else {
-			p.advance("]")
-		}
-		return token
+	t.infixLed("and", 25, func(t *ast, p *parser, left *ast) *ast {
+		left.children = append(left.children, t.children...)
+		return left
 	})
-
-	t.infixRight("and", 25)
-	t.infixRight(",", 25)
-	t.infixRight("or", 25)
-
-	t.infixRight("=", 10)
-	t.infixRight("+=", 10)
-	t.infixRight("-=", 10)
-
-	t.infixRightLed("->", 10, func(token *ast, p *parser, left *ast) *ast {
-		if left.sym != "()" && left.sym != "(IDENT)" {
-			panic(fmt.Sprint("INVALID FUNC DECLARATION TUPLE", left))
-		}
-		if left.sym == "()" && len(left.children) != 0 {
-			named := true
-			for _, child := range left.children {
-				if child.sym != "(IDENT)" {
-					named = false
-					break
-				}
-			}
-			if !named {
-				panic(fmt.Sprint("INVALID FUNC DECLARATION TUPLE", left))
-			}
-		}
-		token.children = append(token.children, left)
-		if p.lexer.peek().sym == "{" {
-			token.children = append(token.children, p.block())
-		} else {
-			token.children = append(token.children, p.expression(0))
-		}
-		return token
+	t.infixLed(",", 25, func(t *ast, p *parser, left *ast) *ast {
+		left.children = append(left.children, t.children...)
+		return left
 	})
-
 	t.prefix("-")
-	t.prefix("not")
 
 	t.prefixNud("(", func(t *ast, p *parser) *ast {
 		comma := false
