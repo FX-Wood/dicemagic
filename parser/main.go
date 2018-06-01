@@ -35,7 +35,7 @@ func main() {
 				fmt.Printf("%+v\n", v)
 			}
 			fmt.Printf("for a total of: %+v\n", v)
-			fmt.Printf("map: %+v\n", ds.ColorTotals)
+			fmt.Printf("map: %+v\n", ds.TotalsByColor)
 			fmt.Println("----------")
 		}
 	}
@@ -74,9 +74,9 @@ func (t *ast) eval(ds *DiceSet) (float64, *DiceSet, error) {
 		intx = int64(math.Max(1, e))
 		switch t.sym {
 		case "-H":
-			ds.h = intx
+			ds.keepHighest = intx
 		case "-L":
-			ds.l = intx
+			ds.leepLowest = intx
 		}
 		return 0, ds, nil
 	case "d":
@@ -169,18 +169,23 @@ func printAST(t *ast, identation int) {
 func (t *ast) preformArithmitic(ds *DiceSet, op string) (float64, *DiceSet, error) {
 	//arithmitic is always binary
 	var x float64
-	diceCount := len(ds.Dice)
+	//...except for the "-" unary operator
+	if len(t.children) < 2 {
 
-	ds.ColorSetDepth++
-	x, ds, err := t.children[0].eval(ds)
-	if err != nil {
-		return 0, ds, err
 	}
-	y, ds, err := t.children[1].eval(ds)
-	if err != nil {
-		return 0, ds, err
+	diceCount := len(ds.Dice)
+	for _, c := range t.children {
+		ds.colorDepth++
+		x, ds, err := t.children[0].eval(ds)
+		if err != nil {
+			return 0, ds, err
+		}
+		y, ds, err := t.children[1].eval(ds)
+		if err != nil {
+			return 0, ds, err
+		}
+		ds.colorDepth--
 	}
-	ds.ColorSetDepth--
 	newDice := len(ds.Dice) - diceCount
 	switch op {
 	case "+":
@@ -240,41 +245,30 @@ type Dice struct {
 	Faces       []int64
 	Max         int64
 	Min         int64
-	H           int64
-	L           int64
+	KeepHighest int64
+	KeepLowest  int64
 	Color       string
 }
 type DiceSet struct {
 	Dice          []Dice
-	ColorTotals   map[string]float64
-	h             int64
-	l             int64
+	TotalsByColor map[string]float64
+	keepHighest   int64
+	leepLowest    int64
 	colors        []string
-	ColorSetDepth int
-	paused        bool
-}
-
-//Pause pauses the collection of ColorTotals
-func (d *DiceSet) Pause() {
-	d.paused = true
-}
-
-//UnPause resumes the collection of ColorTotals
-func (d *DiceSet) UnPause() {
-	d.paused = false
+	colorDepth    int
 }
 
 //PushAndRoll adds a dice roll to the "stack" applying any values from the set
 func (d *DiceSet) PushAndRoll(dice Dice) (int64, error) {
-	if d.ColorSetDepth == 0 {
+	if d.colorDepth == 0 {
 		dice.Color = d.PopColor()
 	} else {
 		dice.Color = d.PeekColor()
 	}
-	dice.H = d.h
-	dice.L = d.l
-	d.l = 0
-	d.h = 0
+	dice.KeepHighest = d.keepHighest
+	dice.KeepLowest = d.leepLowest
+	d.leepLowest = 0
+	d.keepHighest = 0
 	res, err := dice.Roll()
 	if err != nil {
 		return 0, err
@@ -319,11 +313,11 @@ func (d *DiceSet) Top(loc int) *Dice {
 
 //AddToColor increments the total result for a given color
 func (d *DiceSet) AddToColor(color string, value float64) {
-	if d.ColorTotals == nil {
-		d.ColorTotals = make(map[string]float64)
+	if d.TotalsByColor == nil {
+		d.TotalsByColor = make(map[string]float64)
 	}
-	if d.ColorSetDepth == 0 && !d.paused {
-		d.ColorTotals[color] += value
+	if d.colorDepth == 0 {
+		d.TotalsByColor[color] += value
 	}
 }
 
@@ -331,13 +325,13 @@ func (d *Dice) Roll() (int64, error) {
 	if d.resultTotal != 0 {
 		return d.resultTotal, nil
 	}
-	faces, result, err := roll(d.Count, d.Sides, d.H, d.L)
+	faces, result, err := roll(d.Count, d.Sides, d.KeepHighest, d.KeepLowest)
 	if err != nil {
 		return 0, err
 	}
 	d.Min = d.Count
-	if d.H > 0 || d.L > 0 {
-		d.Max = (d.H + d.L) * d.Sides
+	if d.KeepHighest > 0 || d.KeepLowest > 0 {
+		d.Max = (d.KeepHighest + d.KeepLowest) * d.Sides
 	} else {
 		d.Max = d.Count * d.Sides
 	}
@@ -378,7 +372,7 @@ func roll(numberOfDice int64, sides int64, H int64, L int64) ([]int64, int64, er
 		}
 		sort.Slice(faces, func(i, j int) bool { return faces[i] < faces[j] })
 		if H > 0 {
-			keptFaces := faces[:int64(len(faces))-H]
+			keptFaces := faces[:H]
 			total = sumInt64(keptFaces...)
 		} else if L > 0 {
 			keptFaces := faces[L:]
@@ -419,7 +413,7 @@ func diceProbability(numberOfDice int64, sides int64, target int64, H int64, L i
 	for product := range c {
 		if H > 0 {
 			sort.Slice(product, func(i, j int) bool { return product[i] < product[j] })
-			product = product[:int64(len(product))-H]
+			product = product[:H]
 		} else if L > 0 {
 			sort.Slice(product, func(i, j int) bool { return product[i] < product[j] })
 			product = product[L:]

@@ -31,17 +31,6 @@ const (
 	eofToken
 )
 
-var opa = map[string]struct {
-	prec   int
-	rAssoc bool
-}{
-	"^": {4, true},
-	"*": {3, false},
-	"/": {3, false},
-	"+": {2, false},
-	"-": {2, false},
-}
-
 //go:generate stringer -type=Token
 
 var eof = rune(0)

@@ -3,9 +3,12 @@ package main
 import (
 	"bytes"
 	"fmt"
+	"strconv"
 	"strings"
 	"unicode"
 	"unicode/utf8"
+
+	"github.com/aasmall/word2number"
 )
 
 type lexer struct {
@@ -17,6 +20,7 @@ type lexer struct {
 	tok    *ast
 	cached bool
 	last   *ast
+	c      *word2number.Converter
 }
 
 func (self *lexer) nextString() *ast {
@@ -102,10 +106,20 @@ func (self *lexer) nextIdent() *ast {
 		}
 	}
 	symbol := text.String()
+
 	if self.tokReg.defined(symbol) {
 		return self.tokReg.token(symbol, symbol, self.line, col)
+	} else if found, value := convertToNumeric(self.c, symbol); found {
+		return self.tokReg.token("(NUMBER)", strconv.Itoa(value), self.line, col)
 	}
 	return self.tokReg.token("(IDENT)", symbol, self.line, col)
+}
+func convertToNumeric(c *word2number.Converter, word string) (bool, int) {
+	n := c.Words2Number(word)
+	if n == 0 {
+		return false, 0
+	}
+	return true, int(n)
 }
 func (self *lexer) next() *ast {
 	// invalidate peekable cache
@@ -226,22 +240,16 @@ func (self *lexer) peek() *ast {
 }
 
 func tdopLexer(source string) *lexer {
-	return &lexer{tokReg: getTokenRegistry(), source: source, index: 0, line: 1, col: 1}
+	c, _ := word2number.NewConverter("en")
+	return &lexer{tokReg: getTokenRegistry(), source: source, index: 0, line: 1, col: 1, c: c}
 }
 
 func getTokenRegistry() *tokenRegistry {
 	t := &tokenRegistry{symTable: make(map[string]*ast)}
 
 	t.symbol("(NUMBER)")
-	t.symbol("(STRING)")
 
-	t.symbol("true")
-	t.symbol("false")
-	t.symbol("none")
-
-	t.consumable(";")
 	t.consumable(")")
-	t.consumable("]")
 	t.consumable(",")
 	t.consumable("and")
 	t.consumable("else")

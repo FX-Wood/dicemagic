@@ -71,7 +71,7 @@ func (self *tokenRegistry) infixRightLed(sym string, bp int, led ledFn) {
 // a prefix token has a single children, the expression that follows
 func (self *tokenRegistry) prefix(sym string) {
 	self.register(sym, 0, func(t *ast, p *parser) *ast {
-		t.children = append(t.children, p.expression(100))
+		t.children = append(t.children, p.expression(200))
 		return t
 	}, nil, nil)
 }
