@@ -10,12 +10,12 @@ if(3D20-H+7 white >20){(2d6)d8 mundane, 1d8+2d6 necrotic, 1d6 Necrotic} else{1d8
 #{12d1+10 necrotic and 10d1-L+5} 
 #roll 12d1+10 fire - 10d1-L+5 
 #roll 2d20-H+8 disadvantage 
-#roll 3d20-L+8 advantage 
+#roll 2d20-L+8 advantage 
 #roll 4d6-L strength 
 #roll {(2d6 red)d8 mundane, 1d8+2d6 necrotic, 1d6 Necrotic }
-#if(20D1-H>=19){(2d6)d8 mundane, 1d8+2d6 necrotic, 1d6 Necrotic} else{1d8 mundane} 
+#if(20D1-H==1){(2d6)d8 mundane, 1d8+2d6 necrotic, 1d6 Necrotic} else{1d8 mundane} 
 #{(3d6d1) mundane, 5d1} 
-#roll {1d10+1d8+1d6+10 mundane and 1d6 fire}
-roll three d20-L2
-roll 7+-3 mundane
-roll 1d12+3*-1 mundane
+#roll {1d10+1d8+1d6+10 mundane and 1d6}
+#roll three d20-L2
+#roll 7+-3 mundane
+#roll 1d4+3*-1 mundane +1d1
