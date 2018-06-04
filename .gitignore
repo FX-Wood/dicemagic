@@ -2,4 +2,4 @@ sa.json
 debug.test
 www/public
 *debug
-parser/parser
+dicelang/cli/cli

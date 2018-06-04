@@ -1,52 +1,61 @@
-package main
+package dicelang
 
 import (
 	"crypto/rand"
 	"fmt"
-	"io/ioutil"
 	"math"
 	"math/big"
-	"os"
 	"sort"
 	"strconv"
 )
 
-func main() {
-	args := os.Args
-	if len(args) > 1 {
-		buf, _ := ioutil.ReadFile(args[1])
-		source := string(buf)
-
-		l := tdopLexer(source)
-		p := parser{lexer: l}
-
-		stmts := p.statements()
-		fmt.Println(source)
-		fmt.Println("----------")
-		for _, stmt := range stmts {
-			printAST(stmt, 0)
-			fmt.Println()
-			v, ds, err := stmt.GetDiceSet()
-			if err != nil {
-				fmt.Printf("Could not parse input: %v\n", err)
-				return
-			}
-			for _, v := range ds.Dice {
-				fmt.Printf("%+v\nProbability: %.2f%%\n", v, v.Probability()*100)
-			}
-			fmt.Printf("for a total of: %+v\n", v)
-			fmt.Printf("map: %+v\n", ds.TotalsByColor)
-			fmt.Println("----------")
-		}
-	}
+//Dice represents a a throw of a single type of die
+type Dice struct {
+	Count       int64
+	Sides       int64
+	Total       int64
+	Faces       []int64
+	Max         int64
+	Min         int64
+	DropHighest int64
+	DropLowest  int64
+	Color       string
 }
 
-func (t *ast) GetDiceSet() (float64, DiceSet, error) {
+//DiceSet represents a collection of Dice and their totals by type
+type DiceSet struct {
+	Dice          []Dice
+	TotalsByColor map[string]float64
+	dropHighest   int64
+	dropLowest    int64
+	colors        []string
+	colorDepth    int
+}
+
+//PrintAST prints a formatted version of the ast to StdOut
+func PrintAST(t *AST, identation int) {
+	fmt.Println()
+	for i := 0; i < identation; i++ {
+		fmt.Print(" ")
+	}
+	fmt.Print("(")
+	fmt.Print(t.sym, ":", t.value)
+	if len(t.children) > 0 {
+		for _, c := range t.children {
+			fmt.Print(" ")
+			PrintAST(c, identation+4)
+		}
+	}
+	fmt.Print(")")
+}
+
+//GetDiceSet returns the sum of an AST, a DiceSet, and an error
+func (t *AST) GetDiceSet() (float64, DiceSet, error) {
 	v, ret, err := t.eval(&DiceSet{})
 	return v, *ret, err
 }
 
-func (t *ast) eval(ds *DiceSet) (float64, *DiceSet, error) {
+func (t *AST) eval(ds *DiceSet) (float64, *DiceSet, error) {
 	switch t.sym {
 	case "(NUMBER)":
 		i, _ := strconv.ParseFloat(t.value, 64)
@@ -81,9 +90,6 @@ func (t *ast) eval(ds *DiceSet) (float64, *DiceSet, error) {
 		return 0, ds, nil
 	case "d":
 		dice := Dice{}
-		//sub d's don't get added to totals
-		//ds.Pause()
-		//ds.ColorSetDepth++
 		var nums []int64
 		for i := 0; i < len(t.children); i++ {
 			var num float64
@@ -96,8 +102,6 @@ func (t *ast) eval(ds *DiceSet) (float64, *DiceSet, error) {
 				nums = append(nums, int64(num))
 			}
 		}
-		//ds.UnPause()
-		//ds.ColorSetDepth--
 		dice.Count = nums[0]
 		dice.Sides = nums[1]
 		//actually roll dice here
@@ -128,7 +132,7 @@ func (t *ast) eval(ds *DiceSet) (float64, *DiceSet, error) {
 			return 0, ds, err
 		}
 		fmt.Print(res, " ")
-		var c *ast
+		var c *AST
 		if res {
 			c = t.children[1]
 		} else {
@@ -148,25 +152,9 @@ func (t *ast) eval(ds *DiceSet) (float64, *DiceSet, error) {
 	default:
 		return 0, ds, fmt.Errorf("Unsupported symbol: %s", t.sym)
 	}
-	return 0, ds, fmt.Errorf("bad ast")
 }
 
-func printAST(t *ast, identation int) {
-	fmt.Println()
-	for i := 0; i < identation; i++ {
-		fmt.Print(" ")
-	}
-	fmt.Print("(")
-	fmt.Print(t.sym, ":", t.value)
-	if len(t.children) > 0 {
-		for _, c := range t.children {
-			fmt.Print(" ")
-			printAST(c, identation+4)
-		}
-	}
-	fmt.Print(")")
-}
-func (t *ast) preformArithmitic(ds *DiceSet, op string) (float64, *DiceSet, error) {
+func (t *AST) preformArithmitic(ds *DiceSet, op string) (float64, *DiceSet, error) {
 	//arithmitic is always binary
 	//...except for the "-" unary operator
 	if len(t.children) < 2 {
@@ -238,8 +226,7 @@ func (t *ast) preformArithmitic(ds *DiceSet, op string) (float64, *DiceSet, erro
 
 	return x, ds, nil
 }
-
-func (t *ast) evaluateBoolean(ds *DiceSet) (bool, *DiceSet, error) {
+func (t *AST) evaluateBoolean(ds *DiceSet) (bool, *DiceSet, error) {
 	left, ds, err := t.children[0].eval(ds)
 	if err != nil {
 		return false, ds, err
@@ -265,32 +252,10 @@ func (t *ast) evaluateBoolean(ds *DiceSet) (bool, *DiceSet, error) {
 	return false, ds, fmt.Errorf("Bad bool")
 }
 
-type Dice struct {
-	Count       int64
-	Sides       int64
-	resultTotal int64
-	Faces       []int64
-	Max         int64
-	Min         int64
-	DropHighest int64
-	DropLowest  int64
-	Color       string
-}
-type DiceSet struct {
-	Dice          []Dice
-	TotalsByColor map[string]float64
-	dropHighest   int64
-	dropLowest    int64
-	colors        []string
-	colorDepth    int
-}
-
 //PushAndRoll adds a dice roll to the "stack" applying any values from the set
 func (d *DiceSet) PushAndRoll(dice Dice) (int64, error) {
 	if d.colorDepth == 0 {
 		dice.Color = d.PopColor()
-	} else {
-		//dice.Color = d.PeekColor()
 	}
 	dice.DropHighest = d.dropHighest
 	dice.DropLowest = d.dropLowest
@@ -348,9 +313,10 @@ func (d *DiceSet) AddToColor(color string, value float64) {
 	}
 }
 
+//Roll rolls the dice, sets Min, Max, and Faces. Returns the total. Can be called multiple times and returns the same value each time.
 func (d *Dice) Roll() (int64, error) {
-	if d.resultTotal != 0 {
-		return d.resultTotal, nil
+	if d.Total != 0 {
+		return d.Total, nil
 	}
 	faces, result, err := roll(d.Count, d.Sides, d.DropHighest, d.DropLowest)
 	if err != nil {
@@ -363,13 +329,16 @@ func (d *Dice) Roll() (int64, error) {
 		d.Max = d.Count * d.Sides
 	}
 	d.Faces = faces
-	d.resultTotal = result
+	d.Total = result
 	return result, nil
 }
 
-func (d *Dice) Probability() float64 {
-	if d.resultTotal > 0 {
-		return diceProbability(d.Count, d.Sides, d.resultTotal, d.DropHighest, d.DropLowest)
+//Probability evaluates the probability of a dice roll.
+//comparisonOperator: "==", ">", "<", ">=", "<="
+//target: value to compare against.
+func (d *Dice) Probability(comparisonOperator string, target int64) float64 {
+	if d.Total > 0 {
+		return diceProbability(d.Count, d.Sides, d.Total, d.DropHighest, d.DropLowest, comparisonOperator)
 	}
 	return 0
 }
@@ -428,7 +397,7 @@ func generateRandomInt(min int64, max int64) (int64, error) {
 	return n + int64(min), nil
 }
 
-func diceProbability(numberOfDice int64, sides int64, target int64, H int64, L int64) float64 {
+func diceProbability(numberOfDice int64, sides int64, target int64, H int64, L int64, comparisonOperator string) float64 {
 	rollAmount := math.Pow(float64(sides), float64(numberOfDice))
 	targetAmount := float64(0)
 	var possibilities []int64
@@ -445,8 +414,27 @@ func diceProbability(numberOfDice int64, sides int64, target int64, H int64, L i
 			sort.Slice(product, func(i, j int) bool { return product[i] < product[j] })
 			product = product[L:]
 		}
-		if sumInt64(product...) == target {
-			targetAmount++
+		switch comparisonOperator {
+		case ">":
+			if sumInt64(product...) > target {
+				targetAmount++
+			}
+		case "<":
+			if sumInt64(product...) < target {
+				targetAmount++
+			}
+		case ">=":
+			if sumInt64(product...) >= target {
+				targetAmount++
+			}
+		case "<=":
+			if sumInt64(product...) <= target {
+				targetAmount++
+			}
+		default:
+			if sumInt64(product...) == target {
+				targetAmount++
+			}
 		}
 	}
 	return (targetAmount / rollAmount)
