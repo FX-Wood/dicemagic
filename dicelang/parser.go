@@ -45,17 +45,29 @@ func (parse *Parser) expression(rbp int) (*AST, error) {
 	if t.nud != nil {
 		left, _ = t.nud(t, parse)
 	} else {
-		panic(fmt.Sprint("NOT PREFIX", t))
+		return nil, LexError{err: fmt.Sprintf("token \"%s\"not prefix", t.value), Col: parse.lexer.col, Line: parse.lexer.line}
 	}
-	t, _ = parse.lexer.peek()
+	t, err = parse.lexer.peek()
+	if err != nil {
+		return nil, err
+	}
 	for rbp < t.bindingPower {
-		t, _ = parse.lexer.next()
-		if t.led != nil {
-			left, _ = t.led(t, parse, left)
-		} else {
-			panic(fmt.Sprint("NOT INFIX", t))
+		t, err = parse.lexer.next()
+		if err != nil {
+			return nil, err
 		}
-		t, _ = parse.lexer.peek()
+		if t.led != nil {
+			left, err = t.led(t, parse, left)
+			if err != nil {
+				return nil, err
+			}
+		} else {
+			return nil, LexError{err: fmt.Sprintf("token \"%s\"not infix", t.value), Col: parse.lexer.col, Line: parse.lexer.line}
+		}
+		t, err = parse.lexer.peek()
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	return left, nil
