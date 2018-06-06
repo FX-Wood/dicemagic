@@ -333,16 +333,6 @@ func (d *Dice) Roll() (int64, error) {
 	return result, nil
 }
 
-//Probability evaluates the probability of a dice roll.
-//comparisonOperator: "==", ">", "<", ">=", "<="
-//target: value to compare against.
-func (d *Dice) Probability(comparisonOperator string, target int64) float64 {
-	if d.Total > 0 {
-		return diceProbability(d.Count, d.Sides, d.Total, d.DropHighest, d.DropLowest, comparisonOperator)
-	}
-	return 0
-}
-
 //Roll creates a random number that represents the roll of
 //some dice
 func roll(numberOfDice int64, sides int64, H int64, L int64) ([]int64, int64, error) {
@@ -397,69 +387,6 @@ func generateRandomInt(min int64, max int64) (int64, error) {
 	return n + int64(min), nil
 }
 
-func diceProbability(numberOfDice int64, sides int64, target int64, H int64, L int64, comparisonOperator string) float64 {
-	rollAmount := math.Pow(float64(sides), float64(numberOfDice))
-	targetAmount := float64(0)
-	var possibilities []int64
-	for i := int64(1); i <= sides; i++ {
-		possibilities = append(possibilities, i)
-	}
-	c := make(chan []int64)
-	go generateProducts(c, possibilities, numberOfDice)
-	for product := range c {
-		if H > 0 {
-			sort.Slice(product, func(i, j int) bool { return product[i] < product[j] })
-			product = product[:int64(len(product))-H]
-		} else if L > 0 {
-			sort.Slice(product, func(i, j int) bool { return product[i] < product[j] })
-			product = product[L:]
-		}
-		switch comparisonOperator {
-		case ">":
-			if sumInt64(product...) > target {
-				targetAmount++
-			}
-		case "<":
-			if sumInt64(product...) < target {
-				targetAmount++
-			}
-		case ">=":
-			if sumInt64(product...) >= target {
-				targetAmount++
-			}
-		case "<=":
-			if sumInt64(product...) <= target {
-				targetAmount++
-			}
-		default:
-			if sumInt64(product...) == target {
-				targetAmount++
-			}
-		}
-	}
-	return (targetAmount / rollAmount)
-}
-
-func generateProducts(c chan []int64, possibilities []int64, numberOfDice int64) {
-	lens := int64(len(possibilities))
-	for ix := make([]int64, numberOfDice); ix[0] < lens; nextIndex(ix, lens) {
-		r := make([]int64, numberOfDice)
-		for i, j := range ix {
-			r[i] = possibilities[j]
-		}
-		c <- r
-	}
-	close(c)
-}
-func nextIndex(ix []int64, lens int64) {
-	for j := len(ix) - 1; j >= 0; j-- {
-		ix[j]++
-		if j == 0 || ix[j] < lens {
-			return
-		}
-		ix[j] = 0
-	}
-}
 func sumInt64(nums ...int64) int64 {
 	r := int64(0)
 	for _, n := range nums {

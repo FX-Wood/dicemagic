@@ -3,3 +3,4 @@ debug.test
 www/public
 *debug
 dicelang/cli/cli
+coverage.out
