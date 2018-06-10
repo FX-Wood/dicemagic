@@ -10,7 +10,8 @@ import (
 	"math/big"
 	"math/rand"
 	"net/http"
-	"strings"
+
+	"github.com/aasmall/dicemagic/dicelang"
 
 	"github.com/aasmall/dicemagic/roll"
 	"google.golang.org/appengine"
@@ -43,13 +44,20 @@ func SlackRollHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	content := fmt.Sprintf("roll %s", r.FormValue("text"))
-	expression, err := roll.NewParser(strings.NewReader(content)).Parse()
+	stmts, err := dicelang.NewParser(content).Statements()
+	if err != nil {
+		printErrorToSlack(ctx, err, w, r)
+		return
+	}
+	totalsMap, dice, err := dicelang.GetDiceSets(stmts...)
 	if err != nil {
 		printErrorToSlack(ctx, err, w, r)
 		return
 	}
 	slackRollResponse := SlackRollJSONResponse{}
-	attachment, err := rollExpressionToSlackAttachment(expression)
+	attachment := Attachment{
+		Fields: []Field{
+			{Title: "foo", Value: "bar"}}}
 	if err != nil {
 		printErrorToSlack(ctx, err, w, r)
 		return
@@ -70,6 +78,10 @@ func rollDecisionToSlackAttachment(decision *roll.RollDecision) (Attachment, err
 	field := Field{Title: decision.Choices[decision.Result], Short: true}
 	attachment.Fields = append(attachment.Fields, field)
 	return attachment, nil
+}
+
+func createSlackAttachment(totalsMap map[string]float64, dice []dicelang.Dice) (Attachment, error) {
+
 }
 
 func rollExpressionToSlackAttachment(expression *roll.RollExpression) (Attachment, error) {

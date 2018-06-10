@@ -45,7 +45,7 @@ func (parse *Parser) expression(rbp int) (*AST, error) {
 	if t.nud != nil {
 		left, _ = t.nud(t, parse)
 	} else {
-		return nil, LexError{err: fmt.Sprintf("token \"%s\"not prefix", t.value), Col: parse.lexer.col, Line: parse.lexer.line}
+		return nil, LexError{err: fmt.Sprintf("token \"%s\" is not prefix", t.value), Col: parse.lexer.col, Line: parse.lexer.line}
 	}
 	t, err = parse.lexer.peek()
 	if err != nil {
@@ -62,7 +62,7 @@ func (parse *Parser) expression(rbp int) (*AST, error) {
 				return nil, err
 			}
 		} else {
-			return nil, LexError{err: fmt.Sprintf("token \"%s\"not infix", t.value), Col: parse.lexer.col, Line: parse.lexer.line}
+			return nil, LexError{err: fmt.Sprintf("token \"%s\" is not infix", t.value), Col: parse.lexer.col, Line: parse.lexer.line}
 		}
 		t, err = parse.lexer.peek()
 		if err != nil {
@@ -127,6 +127,7 @@ func (parse *Parser) advance(sym string) (*AST, error) {
 	line := parse.lexer.line
 	col := parse.lexer.col
 	token, err := parse.lexer.next()
+
 	if err != nil {
 		return nil, err
 	}

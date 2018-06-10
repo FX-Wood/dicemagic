@@ -1,6 +1,7 @@
 package dicelang
 
 import (
+	"bytes"
 	"crypto/rand"
 	"fmt"
 	"math"
@@ -24,12 +25,21 @@ type Dice struct {
 
 //DiceSet represents a collection of Dice and their totals by type
 type DiceSet struct {
-	Dice          []Dice
-	TotalsByColor map[string]float64
-	dropHighest   int64
-	dropLowest    int64
-	colors        []string
-	colorDepth    int
+	Dice            []Dice
+	TotalsByColor   map[string]float64
+	dropHighest     int64
+	dropLowest      int64
+	colors          []string
+	colorDepth      int
+	StrBuf          bytes.Buffer
+	ExpressionStack Stack
+	OperandStack    Stack
+}
+
+type flatToken struct {
+	sym   string
+	value string
+	rbp   int
 }
 
 //PrintAST prints a formatted version of the ast to StdOut
@@ -49,44 +59,144 @@ func PrintAST(t *AST, identation int) {
 	fmt.Print(")")
 }
 
-//GetDiceSet returns the sum of an AST, a DiceSet, and an error
-func (t *AST) GetDiceSet() (float64, DiceSet, error) {
-	v, ret, err := t.eval(&DiceSet{})
-	return v, *ret, err
+//ReStringAST is a modified shunting yard which converts an AST back to an infix expression.
+func ReStringAST(t *AST) string {
+	var s Stack
+	var buff bytes.Buffer
+	//var lastRBB int
+	ch := make(chan flatToken)
+	go func() {
+		emitTokens(ch, t)
+		close(ch)
+	}()
+	for token := range ch {
+		fmt.Printf(token.sym + ":" + token.value + "\n")
+		fmt.Println("Stack:")
+		fmt.Println(s.String())
+		switch token.sym {
+		case "+", "-", "*", "^", "-L", "-H":
+			op1 := s.Pop().(flatToken)
+			op2 := s.Pop().(flatToken)
+
+			if token.rbp < op2.rbp {
+				s.Push(flatToken{
+					value: fmt.Sprintf("(%s %s %s)", op2.value, token.value, op1.value),
+					sym:   token.sym,
+					rbp:   token.rbp})
+			} else {
+				s.Push(flatToken{
+					value: fmt.Sprintf("%s %s %s", op2.value, token.value, op1.value),
+					sym:   token.sym,
+					rbp:   token.rbp})
+			}
+			//lastRBB = t.rbp
+		// case "-L", "-H":
+		// 	op1 := s.Pop().(flatToken)
+		// 	op2 := s.Pop().(flatToken)
+		// 	if token.rbp < op2.rbp {
+		// 		s.Push(flatToken{
+		// 			value: fmt.Sprintf("(%s%s%s)", op2.value, token.value, op1.value),
+		// 			sym:   token.sym,
+		// 			rbp:   token.rbp})
+		// 	} else {
+		// 		s.Push(flatToken{
+		// 			value: fmt.Sprintf("%s%s%s", op2.value, token.value, op1.value),
+		// 			sym:   token.sym,
+		// 			rbp:   token.rbp})
+		// 	}
+		case "d":
+			op1 := s.Pop().(flatToken)
+			op2 := s.Pop().(flatToken)
+			s.Push(flatToken{value: fmt.Sprintf("%s%s%s(%%s)", op2.value, token.value, op1.value), sym: token.sym, rbp: token.rbp})
+		case "(NUMBER)":
+			s.Push(token)
+		default:
+			buff.WriteString(token.value + " ")
+			// if top := s.Pop(); top != nil {
+			// 	buff.WriteString(top.(string))
+			// }
+		}
+	}
+	if top := s.Pop(); top != nil {
+		buff.WriteString(top.(flatToken).value)
+	}
+	return "\n" + buff.String()
 }
 
+func emitTokens(ch chan flatToken, t *AST) {
+	if len(t.children) > 0 {
+		for _, c := range t.children {
+			emitTokens(ch, c)
+		}
+	}
+	ch <- flatToken{sym: t.sym, value: t.value, rbp: t.bindingPower}
+}
+
+// Convert AST to Infix expression
+func (t *AST) String() string {
+	var buf bytes.Buffer
+	t.evalToInfixString(&buf)
+	return buf.String()
+}
+
+func (t *AST) evalToInfixString(buf *bytes.Buffer) {
+	switch sym := t.sym; sym {
+	case "(NUMBER)":
+		buf.WriteString(t.value)
+	}
+}
+
+// GLWT Public License
+// Copyright (c) Everyone, except Author
+//
+// The author has absolutely no clue what the code in this function does.
+// It might just work or not, there is no third option.
+//
+// Everyone is permitted to copy, distribute, modify, merge, sell, publish,
+// sublicense or whatever they want with this function but at their OWN RISK.
+//
+//
+//                 GOOD LUCK WITH THAT PUBLIC LICENSE
+//    TERMS AND CONDITIONS FOR COPYING, DISTRIBUTION, AND MODIFICATION
+//
+// 0. You just DO WHATEVER YOU WANT TO as long as you NEVER LEAVE A
+// TRACE TO TRACK THE AUTHOR of the original product to blame for or held
+// responsible.
+//
+// IN NO EVENT SHALL THE AUTHORS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY,
+// WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
+// CONNECTION WITH THE FUNCTION OR THE USE OR OTHER DEALINGS IN THE FUNCTION.
+//
+// Good luck and Godspeed.
 func (t *AST) eval(ds *DiceSet) (float64, *DiceSet, error) {
+	fmt.Println(ds.ExpressionStack.String())
 	switch t.sym {
 	case "(NUMBER)":
 		i, _ := strconv.ParseFloat(t.value, 64)
+		ds.ExpressionStack.Push(t.value)
 		if len(t.children) > 0 {
 			//grab any color below, get it on ds
 			t.children[0].eval(ds)
 		}
 		return i, ds, nil
 	case "-H", "-L":
-		var intx int64
-		var e float64
-		if len(t.children) != 0 {
-			var (
-				err error
-				x   float64
-			)
-			for _, c := range t.children {
-				x, ds, err = c.eval(ds)
-				if err != nil {
-					return 0, ds, err
-				}
-				e += x
+		var sum, z float64
+		var err error
+
+		for _, c := range t.children {
+			z, ds, err = c.eval(ds)
+			if err != nil {
+				return 0, ds, err
 			}
+			sum += z
 		}
-		intx = int64(math.Max(1, e))
 		switch t.sym {
 		case "-H":
-			ds.dropHighest = intx
+			ds.dropHighest = int64(sum)
 		case "-L":
-			ds.dropLowest = intx
+			ds.dropLowest = int64(sum)
 		}
+		ds.ExpressionStack.Push(t.sym + strconv.FormatInt(int64(sum), 10))
 		return 0, ds, nil
 	case "d":
 		dice := Dice{}
@@ -106,6 +216,7 @@ func (t *AST) eval(ds *DiceSet) (float64, *DiceSet, error) {
 		dice.Sides = nums[1]
 		//actually roll dice here
 		res, err := ds.PushAndRoll(dice)
+
 		return float64(res), ds, err
 	case "+", "-", "*", "/", "^":
 		x, ds, err := t.preformArithmitic(ds, t.sym)
@@ -127,6 +238,7 @@ func (t *AST) eval(ds *DiceSet) (float64, *DiceSet, error) {
 		ds.PushColor(t.value)
 		return 0, ds, nil
 	case "if":
+		ds.StrBuf.WriteString(t.value + " ")
 		res, ds, err := t.children[0].evaluateBoolean(ds)
 		if err != nil {
 			return 0, ds, err

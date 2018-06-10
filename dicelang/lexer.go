@@ -348,7 +348,7 @@ func getTokenRegistry() *tokenRegistry {
 	t.infix("^", 70)
 	t.infix("d", 80)
 
-	t.infixLed("-L", 30, func(t *AST, p *Parser, left *AST) (*AST, error) {
+	t.infixLed("-L", 80, func(t *AST, p *Parser, left *AST) (*AST, error) {
 		next, err := p.lexer.peek()
 		if err != nil {
 			return nil, err
@@ -359,11 +359,13 @@ func getTokenRegistry() *tokenRegistry {
 				return nil, err
 			}
 			t.children = append(t.children, token)
+		} else {
+			t.children = append(t.children, p.lexer.tokReg.token("(NUMBER)", "1", p.lexer.line, p.lexer.col))
 		}
 		left.children = append(left.children, t)
 		return left, nil
 	})
-	t.infixLed("-H", 30, func(t *AST, p *Parser, left *AST) (*AST, error) {
+	t.infixLed("-H", 80, func(t *AST, p *Parser, left *AST) (*AST, error) {
 		next, err := p.lexer.peek()
 		if err != nil {
 			return nil, err
@@ -374,6 +376,8 @@ func getTokenRegistry() *tokenRegistry {
 				return nil, err
 			}
 			t.children = append(t.children, token)
+		} else {
+			t.children = append(t.children, p.lexer.tokReg.token("(NUMBER)", "1", p.lexer.line, p.lexer.col))
 		}
 		left.children = append(left.children, t)
 		return left, nil
@@ -512,10 +516,6 @@ func getTokenRegistry() *tokenRegistry {
 		return t, nil
 	})
 
-	// t.stmt("(IDENT)", func(t *AST, p *Parser) *AST {
-	// 	t.children = append(t.children, p.Statements()...)
-	// 	return t
-	// })
 	t.stmt("(NEWLINE)", func(t *AST, p *Parser) (*AST, error) {
 		next, err := p.lexer.peek()
 		if err != nil {
@@ -567,7 +567,7 @@ func isIdentChar(r rune) bool {
 }
 
 func isOperatorChar(r rune) bool {
-	operators := "!@#$%^*()-+=/?.,:;\"|/{}[]><dDLH"
+	operators := "^*()-+=/?.,:;\"|/{}[]><dDLH"
 	for _, c := range operators {
 		if c == r {
 			return true

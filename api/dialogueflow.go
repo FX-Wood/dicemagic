@@ -9,6 +9,7 @@ import (
 	"net/http/httputil"
 	"strings"
 
+	"github.com/aasmall/dicemagic/dicelang"
 	"github.com/aasmall/dicemagic/roll"
 	"go.opencensus.io/trace"
 
@@ -99,6 +100,33 @@ type DialogueFlowResponse struct {
 	} `json:"followupEventInput,omitempty"`
 }
 
+//AssistantResponse represents a response that will be sent to Dialogflow for Google Actions API
+type AssistantResponse struct {
+	ExpectUserResponse bool          `json:"expectUserResponse,omitempty"`
+	IsSsml             bool          `json:"isSsml,omitempty"`
+	NoInputPrompts     []interface{} `json:"noInputPrompts,omitempty"`
+	RichResponse       `json:"richResponse,omitempty"`
+}
+type RichResponse struct {
+	Items       []interface{} `json:"items,omitempty"`
+	Suggestions []struct {
+		Title string `json:"title,omitempty"`
+	} `json:"suggestions,omitempty"`
+}
+type SimpleResponseItem struct {
+	SimpleResponse struct {
+		TextToSpeech string `json:"textToSpeech"`
+		DisplayText  string `json:"displayText"`
+	} `json:"simpleResponse,omitempty"`
+}
+
+type BasicCardItem struct {
+	BasicCard struct {
+		Title         string `json:"title,omitempty"`
+		FormattedText string `json:"formattedText,omitempty"`
+	} `json:"basicCard,omitempty"`
+}
+
 func DialogueWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	//response := "This is a sample response from your webhook!"
 	ctx := appengine.NewContext(r)
@@ -134,7 +162,7 @@ func DialogueWebhookHandler(w http.ResponseWriter, r *http.Request) {
 	case "roll":
 		handleRollIntent(ctx, *dialogueFlowRequest, w, r)
 	case "decide":
-		handleDecideIntent(ctx, *dialogueFlowRequest, w, r)
+		//handleDecideIntent(ctx, *dialogueFlowRequest, w, r)
 	case "command":
 		handleCommandIntent(ctx, *dialogueFlowRequest, w, r)
 	case "remember":
@@ -222,35 +250,33 @@ func handleRollCommand(ctx context.Context, command roll.RollCommand, w http.Res
 
 	var formattedText bytes.Buffer
 
-	diceExpressionCount := len(command.RollExpresions)
-	t := int64(0)
-	for i := 0; i < diceExpressionCount; i++ {
+	t := float64(0)
+	var maps []map[string]float64
+	var dice []dicelang.Dice
+	for i := 0; i < len(command.RollExpresions); i++ {
 		// Roll all the dice!
-		err := command.RollExpresions[i].Total()
-		if err != nil {
-			printErrorToDialogFlow(ctx, err, w, r)
-			return
+		total, ds, err := command.RollExpresions[i].GetDiceSet()
+		maps = append(maps, ds.TotalsByColor)
+		for _, d := range ds.Dice {
+			dice = append(dice, d)
 		}
-		// Populate generic Fulfillment Messages
-		fulfillmentMessage := rollExpressionToFulfillmentMessage(&command.RollExpresions[i])
-		dialogueFlowResponse.FulfillmentMessages = append(dialogueFlowResponse.FulfillmentMessages, fulfillmentMessage)
-		// Populate slack Payload
-		attachment, err := rollExpressionToSlackAttachment(&command.RollExpresions[i])
-		if err != nil {
-			printErrorToDialogFlow(ctx, err, w, r)
-			return
-		}
-		slackRollResponse.Attachments = append(slackRollResponse.Attachments, attachment)
-		markdownRow, loopTotal, err := rollExpressionToMarkdown(&command.RollExpresions[i])
-		formattedText.WriteString(markdownRow)
-		if i != diceExpressionCount-1 {
-			formattedText.WriteString("  \n---  \n")
-		}
-		t += loopTotal
+		d := dicelang.DiceSet{}
+		t += total
 	}
+	totalsMap := dicelang.MergeDiceTotalMaps(maps...)
+	for k, v := range totalsMap {
+		var s string
+		if k == "" {
+			s = "unspecified"
+		} else {
+			s = k
+		}
+		formattedText.WriteString(fmt.Sprintf("%s: %.2f \n", s, v))
+	}
+	formattedText.Truncate(len(formattedText.String()) - 2)
 
 	simpleResponseItem := SimpleResponseItem{}
-	if diceExpressionCount > 1 {
+	if len(command.RollExpresions) > 1 {
 		simpleResponseItem.SimpleResponse.TextToSpeech = "Rolling."
 	} else {
 		simpleResponseItem.SimpleResponse.TextToSpeech = fmt.Sprintf("You rolled %d", t)
@@ -270,47 +296,6 @@ func handleRollCommand(ctx context.Context, command roll.RollCommand, w http.Res
 	//Send Response
 	w.Header().Set("Content-Type", "application/json")
 
-	json.NewEncoder(w).Encode(dialogueFlowResponse)
-}
-
-func handleDecideIntent(ctx context.Context, dialogueFlowRequest DialogueFlowRequest, w http.ResponseWriter, r *http.Request) {
-
-	dialogueFlowResponse := new(DialogueFlowResponse)
-	slackRollResponse := SlackRollJSONResponse{}
-
-	//create a RollDecision and fill it
-	rollDecision := roll.RollDecision{}
-	rollDecision.Question = dialogueFlowRequest.QueryResult.QueryText
-
-	dflowChoices := dialogueFlowRequest.QueryResult.Parameters["Choices"].([]interface{})
-
-	if len(dflowChoices) < 2 {
-		rollDecision.Choices = append(rollDecision.Choices, "Yes")
-		rollDecision.Choices = append(rollDecision.Choices, "No")
-	} else {
-		for _, v := range dflowChoices {
-			rollDecision.Choices = append(rollDecision.Choices, strings.Title(v.(string)))
-		}
-		log.Debugf(ctx, fmt.Sprintf("Choices(%d): %v", len(rollDecision.Choices), rollDecision.Choices))
-	}
-	d := roll.Dice{Count: int64(1), Sides: int64(len(rollDecision.Choices))}
-	result, err := d.Roll()
-	if err != nil {
-		log.Errorf(ctx, "Couldn't roll dice: %v", err)
-		return
-	}
-	rollDecision.Result = result - 1
-
-	log.Debugf(ctx, fmt.Sprintf("RollDecision:\n%+v", rollDecision))
-
-	//create a slack attachment from RollDecision
-	attachment, _ := rollDecisionToSlackAttachment(&rollDecision)
-	//attach it to Slack payload
-	slackRollResponse.Attachments = append(slackRollResponse.Attachments, attachment)
-	slackRollResponse.Text = "I'll roll some dice to help you make that decision."
-	dialogueFlowResponse.Payload.Slack = slackRollResponse
-	//log.Debugf(ctx, spew.Sprintf("My Response:\n%+v", dialogueFlowResponse))
-	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(dialogueFlowResponse)
 }
 func handleRollIntent(ctx context.Context, dialogueFlowRequest DialogueFlowRequest, w http.ResponseWriter, r *http.Request) {
@@ -340,20 +325,6 @@ func handleRollIntent(ctx context.Context, dialogueFlowRequest DialogueFlowReque
 	}
 	handleRollCommand(ctx, command, w, r)
 
-}
-
-func rollExpressionToFulfillmentMessage(expression *roll.RollExpression) DialogFlowFulfillmentMessage {
-	returnMessage := DialogFlowFulfillmentMessage{}
-	returnMessage.DialogFlowCard.Title = ""
-
-	//Dice rolls into Expanded, formatted string
-	var fmtString []interface{}
-	for i, d := range expression.DiceSet.Dice {
-		fmtString = append(fmtString, fmt.Sprintf("%dd%d(%d)", d.Count, d.Sides, expression.DiceSet.ResultTotals[i]))
-	}
-	returnMessage.DialogFlowCard.Title = expression.FormattedString()
-	returnMessage.DialogFlowCard.Subtitle = expression.TotalsString()
-	return returnMessage
 }
 
 func printErrorToDialogFlow(ctx context.Context, err error, w http.ResponseWriter, r *http.Request) {

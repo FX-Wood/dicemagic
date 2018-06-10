@@ -4,8 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/gob"
-	"strings"
 
+	"github.com/aasmall/dicemagic/dicelang"
 	"google.golang.org/appengine/log"
 	"google.golang.org/appengine/memcache"
 	"google.golang.org/appengine/taskqueue"
@@ -34,35 +34,23 @@ type Command interface {
 
 //compiletime check that RollCommand implements the
 //comand interface
-var _ Command = &RollCommand{}
+//var _ Command = &RollCommand{}
 
 type RollCommand struct {
 	ID             string
-	RollExpresions []RollExpression
-}
-
-func (r *RollCommand) String() string {
-	var buffer bytes.Buffer
-	for i, e := range r.RollExpresions {
-		if i == len(r.RollExpresions) {
-			buffer.WriteString(e.String())
-		} else {
-			buffer.WriteString(e.String())
-			buffer.WriteString("and ")
-		}
-	}
-	return buffer.String()
+	RollExpresions []*dicelang.AST
 }
 
 //FromString parses input strings and returns a constructed RollCommand
 //by calling the perser
 func (r *RollCommand) FromString(inputString ...string) error {
 	for _, s := range inputString {
-		expression, err := NewParser(strings.NewReader(s)).Parse()
+		parser := dicelang.NewParser(s)
+		stmts, err := parser.Statements()
 		if err != nil {
 			return err
 		}
-		r.RollExpresions = append(r.RollExpresions, *expression)
+		r.RollExpresions = append(r.RollExpresions, stmts...)
 	}
 	return nil
 }

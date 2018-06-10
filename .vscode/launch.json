@@ -20,7 +20,7 @@
             "host": "127.0.0.1",
             "program": "${fileDirname}",
             "env": {},
-            "args": ["-cmd=roll 2d20","-v" ],
+            "args": ["-cmd=roll (1d2)d4-L + 3d4-L fire","-v" ],
             "showLog": true
         }
     ]

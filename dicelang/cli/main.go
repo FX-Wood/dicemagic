@@ -57,11 +57,12 @@ func printDiceInfo(cmd string, verbose bool) {
 		if verbose {
 			fmt.Print("AST:\n----------")
 			dicelang.PrintAST(stmt, 0)
+			fmt.Printf("%#v", stmt)
 			fmt.Print("\n----------")
 			for _, v := range diceSet.Dice {
 				probMap := dicelang.DiceProbability(v.Count, v.Sides, v.DropHighest, v.DropLowest)
 				keys := sortProbMap(probMap)
-				fmt.Print("\nProbability Map:\n")
+				fmt.Printf("\nProbability Map for %+v:\n", v)
 				for _, k := range keys {
 					fmt.Printf("%2d:  %2.5F%%\n", k, probMap[k])
 				}
@@ -70,6 +71,8 @@ func printDiceInfo(cmd string, verbose bool) {
 		}
 		fmt.Printf("Total: %+v\n", total)
 		fmt.Printf("Color Map: %+v\n", diceSet.TotalsByColor)
+		pre := dicelang.ReStringAST(stmt)
+		fmt.Println(pre)
 		fmt.Println("----------")
 	}
 }

@@ -13,6 +13,7 @@ func main() {
 	trace.ApplyConfig(trace.Config{DefaultSampler: trace.AlwaysSample()})
 	http.HandleFunc("/slack/roll/", SlackRollHandler)
 	http.HandleFunc("/dflow/", DialogueWebhookHandler)
+	http.HandleFunc("/chart/", drawChart)
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		ctx := appengine.NewContext(r)
 		wwwHost, _ := appengine.ModuleHostname(ctx, "www", "", "")
