@@ -43,42 +43,41 @@ func sortProbMap(m map[int64]float64) []int64 {
 func printDiceInfo(cmd string, verbose bool, prob bool) {
 	var p *dicelang.Parser
 	p = dicelang.NewParser(cmd)
-	stmts, err := p.Statements()
+	_, root, err := p.Statements()
 	if err != nil {
 		fmt.Println(err.Error(), err.(dicelang.LexError).Col, err.(dicelang.LexError).Line)
 		return
 	}
-	for i, stmt := range stmts {
-		fmt.Printf("Statement %d\n", i+1)
-		total, diceSet, err := stmt.GetDiceSet()
-		if err != nil {
-			fmt.Printf("Could not parse input: %v\n", err)
-			return
-		}
-		if verbose {
-			fmt.Print("AST:\n----------")
-			dicelang.PrintAST(stmt, 0)
-			fmt.Print("\n----------")
-
-		}
-		if prob {
-			for _, v := range diceSet.Dice {
-				probMap := dicelang.DiceProbability(v.Count, v.Sides, v.DropHighest, v.DropLowest)
-				keys := sortProbMap(probMap)
-				fmt.Printf("\nProbability Map for %+v:\n", v)
-				for _, k := range keys {
-					fmt.Printf("%2d:  %2.5F%%\n", k, probMap[k])
-				}
-				fmt.Print("----------\n")
-			}
-		}
-		fmt.Printf("Total: %+v\n", total)
-		fmt.Printf("Color Map: %+v\n", diceSet.TotalsByColor)
-		//pre := dicelang.ReStringAST(stmt)
-		pre := stmt.String()
-		fmt.Println(pre)
-		fmt.Println("----------")
+	//fmt.Printf("Statement %d\n", i+1)
+	total, diceSet, err := root.GetDiceSet()
+	if err != nil {
+		fmt.Printf("Could not parse input: %v\n", err)
+		return
 	}
+	if verbose {
+		fmt.Print("AST:\n----------")
+		dicelang.PrintAST(root, 0)
+		fmt.Print("\n----------")
+
+	}
+	if prob {
+		for _, v := range diceSet.Dice {
+			probMap := dicelang.DiceProbability(v.Count, v.Sides, v.DropHighest, v.DropLowest)
+			keys := sortProbMap(probMap)
+			fmt.Printf("\nProbability Map for %+v:\n", v)
+			for _, k := range keys {
+				fmt.Printf("%2d:  %2.5F%%\n", k, probMap[k])
+			}
+			fmt.Print("----------\n")
+		}
+	}
+	fmt.Printf("Total: %+v\n", total)
+	fmt.Printf("Color Map: %+v\n", diceSet.TotalsByColor)
+	//pre := dicelang.ReStringAST(stmt)
+	pre := root.String()
+	fmt.Println(pre)
+	fmt.Println("----------")
+
 }
 
 func readRollsFromFile(c chan string, path string) {

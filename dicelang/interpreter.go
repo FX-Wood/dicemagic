@@ -284,6 +284,7 @@ func (token *AST) inverseShuntingYard(buff *bytes.Buffer, preStack *Stack, postS
 		postStack.Push(&AST{Value: "}"})
 	case "if":
 		preStack.Push(token)
+	case "(rootnode)":
 	default:
 		//prefix
 		preStack.Push(token)
@@ -343,7 +344,7 @@ func (t *AST) eval(ds *DiceSet) (float64, *DiceSet, error) {
 			return 0, ds, err
 		}
 		return x, ds, nil
-	case "{", "roll":
+	case "{", "roll", "(rootnode)":
 		var x float64
 		for _, c := range t.Children {
 			y, ds, err := c.eval(ds)

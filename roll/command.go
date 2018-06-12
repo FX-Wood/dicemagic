@@ -46,11 +46,11 @@ type RollCommand struct {
 func (r *RollCommand) FromString(inputString ...string) error {
 	for _, s := range inputString {
 		parser := dicelang.NewParser(s)
-		stmts, err := parser.Statements()
+		_, root, err := parser.Statements()
 		if err != nil {
 			return err
 		}
-		r.RollExpresions = append(r.RollExpresions, stmts...)
+		r.RollExpresions = append(r.RollExpresions, root)
 	}
 	return nil
 }

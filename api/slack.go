@@ -44,7 +44,7 @@ func SlackRollHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	content := r.FormValue("text")
-	stmts, err := dicelang.NewParser(content).Statements()
+	stmts, _, err := dicelang.NewParser(content).Statements()
 	if err != nil {
 		printErrorToSlack(ctx, err, w, r)
 		return

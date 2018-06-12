@@ -74,26 +74,28 @@ func (parse *Parser) expression(rbp int) (*AST, error) {
 }
 
 //Statements returns all statements from the parser as []*AST
-func (parse *Parser) Statements() ([]*AST, error) {
+func (parse *Parser) Statements() ([]*AST, *AST, error) {
+	root := &AST{Value: "", Sym: "(rootnode)"}
 	stmts := []*AST{}
 	next, err := parse.lexer.peek()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	for next.Sym != "(EOF)" && next.Sym != "}" {
 		stmt, err := parse.Statement()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 		if stmt.Sym != "(EOF)" {
+			root.Children = append(root.Children, stmt)
 			stmts = append(stmts, stmt)
 		}
 		next, err = parse.lexer.peek()
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
-	return stmts, nil
+	return stmts, root, nil
 }
 
 func (parse *Parser) block() (*AST, error) {

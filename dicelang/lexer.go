@@ -334,6 +334,7 @@ func getTokenRegistry() *tokenRegistry {
 	t.consumable("and")
 	t.consumable("else")
 
+	t.consumable("(rootnode)")
 	t.consumable("(EOF)")
 	t.consumable("{")
 	t.consumable("}")
@@ -546,7 +547,7 @@ func getTokenRegistry() *tokenRegistry {
 	})
 
 	t.stmt("{", func(t *AST, p *Parser) (*AST, error) {
-		stmts, err := p.Statements()
+		stmts, _, err := p.Statements()
 		if err != nil {
 			return nil, err
 		}
