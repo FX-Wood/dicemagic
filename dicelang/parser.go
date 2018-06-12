@@ -12,15 +12,15 @@ type stdFn func(*AST, *Parser) (*AST, error)
 
 //AST represents a node in an abstract syntax tree
 type AST struct {
-	sym          string
-	value        string
+	Sym          string
+	Value        string
 	line         int
 	col          int
-	bindingPower int
+	BindingPower int
 	nud          nudFn
 	led          ledFn
 	std          stdFn
-	children     []*AST
+	Children     []*AST
 }
 
 // Parser holds a Lexer and implements a top down operator precedence parser (https://tdop.github.io/)
@@ -45,13 +45,13 @@ func (parse *Parser) expression(rbp int) (*AST, error) {
 	if t.nud != nil {
 		left, _ = t.nud(t, parse)
 	} else {
-		return nil, LexError{err: fmt.Sprintf("token \"%s\" is not prefix", t.value), Col: parse.lexer.col, Line: parse.lexer.line}
+		return nil, LexError{err: fmt.Sprintf("token \"%s\" is not prefix", t.Value), Col: parse.lexer.col, Line: parse.lexer.line}
 	}
 	t, err = parse.lexer.peek()
 	if err != nil {
 		return nil, err
 	}
-	for rbp < t.bindingPower {
+	for rbp < t.BindingPower {
 		t, err = parse.lexer.next()
 		if err != nil {
 			return nil, err
@@ -62,7 +62,7 @@ func (parse *Parser) expression(rbp int) (*AST, error) {
 				return nil, err
 			}
 		} else {
-			return nil, LexError{err: fmt.Sprintf("token \"%s\" is not infix", t.value), Col: parse.lexer.col, Line: parse.lexer.line}
+			return nil, LexError{err: fmt.Sprintf("token \"%s\" is not infix", t.Value), Col: parse.lexer.col, Line: parse.lexer.line}
 		}
 		t, err = parse.lexer.peek()
 		if err != nil {
@@ -80,12 +80,12 @@ func (parse *Parser) Statements() ([]*AST, error) {
 	if err != nil {
 		return nil, err
 	}
-	for next.sym != "(EOF)" && next.sym != "}" {
+	for next.Sym != "(EOF)" && next.Sym != "}" {
 		stmt, err := parse.Statement()
 		if err != nil {
 			return nil, err
 		}
-		if stmt.sym != "(EOF)" {
+		if stmt.Sym != "(EOF)" {
 			stmts = append(stmts, stmt)
 		}
 		next, err = parse.lexer.peek()
@@ -101,8 +101,8 @@ func (parse *Parser) block() (*AST, error) {
 	if err != nil {
 		return nil, err
 	}
-	if tok.sym != "{" {
-		return nil, LexError{err: fmt.Sprintf("expected block start not found: %s", tok.sym), Col: parse.lexer.col, Line: parse.lexer.line}
+	if tok.Sym != "{" {
+		return nil, LexError{err: fmt.Sprintf("expected block start not found: %s", tok.Sym), Col: parse.lexer.col, Line: parse.lexer.line}
 	}
 	return tok.std(tok, parse)
 }
@@ -131,8 +131,8 @@ func (parse *Parser) advance(sym string) (*AST, error) {
 	if err != nil {
 		return nil, err
 	}
-	if token.sym != sym {
-		return nil, LexError{err: fmt.Sprintf("did not find expected character \"%s\". Found \"%s\"", sym, token.sym), Col: col, Line: line}
+	if token.Sym != sym {
+		return nil, LexError{err: fmt.Sprintf("did not find expected character \"%s\". Found \"%s\"", sym, token.Sym), Col: col, Line: line}
 	}
 	return token, nil
 }

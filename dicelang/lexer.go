@@ -41,11 +41,11 @@ type tokenRegistry struct {
 
 func (registry *tokenRegistry) token(sym string, value string, line int, col int) *AST {
 	return &AST{
-		sym:          sym,
-		value:        value,
+		Sym:          sym,
+		Value:        value,
 		line:         line,
 		col:          col,
-		bindingPower: registry.symTable[sym].bindingPower,
+		BindingPower: registry.symTable[sym].BindingPower,
 		nud:          registry.symTable[sym].nud,
 		led:          registry.symTable[sym].led,
 		std:          registry.symTable[sym].std,
@@ -70,23 +70,23 @@ func (registry *tokenRegistry) register(sym string, bp int, nud nudFn, led ledFn
 		if std != nil && val.std == nil {
 			val.std = std
 		}
-		if bp > val.bindingPower {
-			val.bindingPower = bp
+		if bp > val.BindingPower {
+			val.BindingPower = bp
 		}
 	} else {
-		registry.symTable[sym] = &AST{bindingPower: bp, nud: nud, led: led, std: std}
+		registry.symTable[sym] = &AST{BindingPower: bp, nud: nud, led: led, std: std}
 	}
 }
 
 // an infix token has two children, the exp on the left and the one that follows
 func (registry *tokenRegistry) infix(sym string, bp int) {
 	registry.register(sym, bp, nil, func(t *AST, p *Parser, left *AST) (*AST, error) {
-		t.children = append(t.children, left)
-		token, err := p.expression(t.bindingPower)
+		t.Children = append(t.Children, left)
+		token, err := p.expression(t.BindingPower)
 		if err != nil {
 			return nil, err
 		}
-		t.children = append(t.children, token)
+		t.Children = append(t.Children, token)
 		return t, nil
 	}, nil)
 }
@@ -97,12 +97,12 @@ func (registry *tokenRegistry) infixLed(sym string, bp int, led ledFn) {
 
 func (registry *tokenRegistry) infixRight(sym string, bp int) {
 	registry.register(sym, bp, nil, func(t *AST, p *Parser, left *AST) (*AST, error) {
-		t.children = append(t.children, left)
-		token, err := p.expression(t.bindingPower - 1)
+		t.Children = append(t.Children, left)
+		token, err := p.expression(t.BindingPower - 1)
 		if err != nil {
 			return nil, err
 		}
-		t.children = append(t.children, token)
+		t.Children = append(t.Children, token)
 		return t, nil
 	}, nil)
 }
@@ -118,7 +118,7 @@ func (registry *tokenRegistry) prefix(sym string) {
 		if err != nil {
 			return nil, err
 		}
-		t.children = append(t.children, token)
+		t.Children = append(t.Children, token)
 		return t, nil
 	}, nil, nil)
 }
@@ -353,16 +353,16 @@ func getTokenRegistry() *tokenRegistry {
 		if err != nil {
 			return nil, err
 		}
-		if next.sym == "(NUMBER)" {
-			token, err := p.expression(t.bindingPower)
+		if next.Sym == "(NUMBER)" {
+			token, err := p.expression(t.BindingPower)
 			if err != nil {
 				return nil, err
 			}
-			t.children = append(t.children, token)
+			t.Children = append(t.Children, token)
 		} else {
-			t.children = append(t.children, p.lexer.tokReg.token("(NUMBER)", "1", p.lexer.line, p.lexer.col))
+			t.Children = append(t.Children, p.lexer.tokReg.token("(NUMBER)", "1", p.lexer.line, p.lexer.col))
 		}
-		left.children = append(left.children, t)
+		left.Children = append(left.Children, t)
 		return left, nil
 	})
 	t.infixLed("-H", 80, func(t *AST, p *Parser, left *AST) (*AST, error) {
@@ -370,16 +370,16 @@ func getTokenRegistry() *tokenRegistry {
 		if err != nil {
 			return nil, err
 		}
-		if next.sym == "(NUMBER)" {
-			token, err := p.expression(t.bindingPower)
+		if next.Sym == "(NUMBER)" {
+			token, err := p.expression(t.BindingPower)
 			if err != nil {
 				return nil, err
 			}
-			t.children = append(t.children, token)
+			t.Children = append(t.Children, token)
 		} else {
-			t.children = append(t.children, p.lexer.tokReg.token("(NUMBER)", "1", p.lexer.line, p.lexer.col))
+			t.Children = append(t.Children, p.lexer.tokReg.token("(NUMBER)", "1", p.lexer.line, p.lexer.col))
 		}
-		left.children = append(left.children, t)
+		left.Children = append(left.Children, t)
 		return left, nil
 	})
 
@@ -393,8 +393,8 @@ func getTokenRegistry() *tokenRegistry {
 	t.infix("!=", 30)
 
 	t.infixLed("(IDENT)", 300, func(t *AST, p *Parser, left *AST) (*AST, error) {
-		t.value = strings.Title(t.value)
-		left.children = append(left.children, t)
+		t.Value = strings.Title(t.Value)
+		left.Children = append(left.Children, t)
 		return left, nil
 	})
 
@@ -403,35 +403,35 @@ func getTokenRegistry() *tokenRegistry {
 		if err != nil {
 			return nil, err
 		}
-		t.children = append(t.children, cond)
+		t.Children = append(t.Children, cond)
 		p.advance("else")
-		t.children = append(t.children, left)
+		t.Children = append(t.Children, left)
 		token, err := p.expression(0)
 		if err != nil {
 			return nil, err
 		}
-		t.children = append(t.children, token)
+		t.Children = append(t.Children, token)
 		return t, nil
 	})
 
 	t.infixLed("(", 90, func(token *AST, p *Parser, left *AST) (*AST, error) {
-		token.children = append(token.children, left)
+		token.Children = append(token.Children, left)
 		t, err := p.lexer.peek()
 		if err != nil {
 			return nil, err
 		}
-		if t.sym != ")" {
+		if t.Sym != ")" {
 			for {
 				exp, err := p.expression(0)
 				if err != nil {
 					return nil, err
 				}
-				token.children = append(token.children, exp)
+				token.Children = append(token.Children, exp)
 				token, err := p.lexer.peek()
 				if err != nil {
 					return nil, err
 				}
-				if token.sym != "," {
+				if token.Sym != "," {
 					break
 				}
 				p.advance(",")
@@ -444,11 +444,11 @@ func getTokenRegistry() *tokenRegistry {
 	})
 
 	t.infixLed("and", 25, func(t *AST, p *Parser, left *AST) (*AST, error) {
-		left.children = append(left.children, t.children...)
+		left.Children = append(left.Children, t.Children...)
 		return left, nil
 	})
 	t.infixLed(",", 25, func(t *AST, p *Parser, left *AST) (*AST, error) {
-		left.children = append(left.children, t.children...)
+		left.Children = append(left.Children, t.Children...)
 		return left, nil
 	})
 	t.prefix("-")
@@ -458,24 +458,24 @@ func getTokenRegistry() *tokenRegistry {
 		if err != nil {
 			return nil, err
 		}
-		if next.sym != ")" {
+		if next.Sym != ")" {
 			for {
 				next, err := p.lexer.peek()
 				if err != nil {
 					return nil, err
 				}
-				if next.sym == ")" {
+				if next.Sym == ")" {
 					break
 				}
 				token, err := p.expression(0)
 				if err != nil {
 					return nil, err
 				}
-				t.children = append(t.children, token)
+				t.Children = append(t.Children, token)
 			}
 		}
 		p.advance(")")
-		return t.children[0], nil
+		return t.Children[0], nil
 	})
 
 	t.stmt("if", func(t *AST, p *Parser) (*AST, error) {
@@ -483,34 +483,34 @@ func getTokenRegistry() *tokenRegistry {
 		if err != nil {
 			return nil, err
 		}
-		t.children = append(t.children, token)
+		t.Children = append(t.Children, token)
 		block, err := p.block()
 		if err != nil {
 			return nil, err
 		}
-		t.children = append(t.children, block)
+		t.Children = append(t.Children, block)
 		next, err := p.lexer.peek()
 		if err != nil {
 			return nil, err
 		}
-		if next.value == "else" {
+		if next.Value == "else" {
 			p.lexer.next()
 			next, err = p.lexer.peek()
 			if err != nil {
 				return nil, err
 			}
-			if next.value == "if" {
+			if next.Value == "if" {
 				stmt, err := p.Statement()
 				if err != nil {
 					return nil, err
 				}
-				t.children = append(t.children, stmt)
+				t.Children = append(t.Children, stmt)
 			} else {
 				block, err := p.block()
 				if err != nil {
 					return nil, err
 				}
-				t.children = append(t.children, block)
+				t.Children = append(t.Children, block)
 			}
 		}
 		return t, nil
@@ -521,7 +521,7 @@ func getTokenRegistry() *tokenRegistry {
 		if err != nil {
 			return nil, err
 		}
-		for next.sym == "(NEWLINE)" {
+		for next.Sym == "(NEWLINE)" {
 			p.advance("(NEWLINE)")
 			next, err = p.lexer.peek()
 			if err != nil {
@@ -529,7 +529,7 @@ func getTokenRegistry() *tokenRegistry {
 			}
 		}
 
-		if next.sym == "(EOF)" {
+		if next.Sym == "(EOF)" {
 			p.advance("(EOF)")
 			return p.lexer.tokReg.token("(EOF)", "EOF", p.lexer.line, p.lexer.col), nil
 		}
@@ -541,7 +541,7 @@ func getTokenRegistry() *tokenRegistry {
 		if err != nil {
 			return nil, err
 		}
-		t.children = append(t.children, stmt)
+		t.Children = append(t.Children, stmt)
 		return t, nil
 	})
 
@@ -550,7 +550,7 @@ func getTokenRegistry() *tokenRegistry {
 		if err != nil {
 			return nil, err
 		}
-		t.children = append(t.children, stmts...)
+		t.Children = append(t.Children, stmts...)
 		p.advance("}")
 		return t, nil
 	})

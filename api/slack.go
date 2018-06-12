@@ -75,8 +75,8 @@ func rollDecisionToSlackAttachment(decision *roll.RollDecision) (Attachment, err
 
 func createSlackAttachments(stmts ...*dicelang.AST) ([]Attachment, error) {
 	var attachments []Attachment
-	var fields []Field
 	for _, stmt := range stmts {
+		var fields []Field
 		total, dice, err := stmt.GetDiceSet()
 		if err != nil {
 			return nil, err

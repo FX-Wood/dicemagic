@@ -46,9 +46,9 @@ func PrintAST(t *AST, identation int) {
 		fmt.Print(" ")
 	}
 	fmt.Print("(")
-	fmt.Print(t.sym, ":", t.value)
-	if len(t.children) > 0 {
-		for _, c := range t.children {
+	fmt.Print(t.Sym, ":", t.Value)
+	if len(t.Children) > 0 {
+		for _, c := range t.Children {
 			fmt.Print(" ")
 			PrintAST(c, identation+4)
 		}
@@ -66,11 +66,11 @@ func ReStringAST(t *AST) string {
 		close(ch)
 	}()
 	for token := range ch {
-		fmt.Printf(token.sym + ":" + token.value + "\n")
-		switch token.sym {
+		fmt.Printf(token.Sym + ":" + token.Value + "\n")
+		switch token.Sym {
 		case "-":
 			//fucking unary operators
-			if len(token.children) == 1 {
+			if len(token.Children) == 1 {
 				shuntUnary(token, &s)
 			} else {
 				shuntBinary(token, &s, " ")
@@ -82,17 +82,17 @@ func ReStringAST(t *AST) string {
 			op1 := s.Pop().(*AST)
 			op2 := s.Pop().(*AST)
 			s.Push(&AST{
-				value:        fmt.Sprintf("%s%s%s", op2.value, token.value, op1.value),
-				sym:          token.sym,
-				bindingPower: token.bindingPower})
+				Value:        fmt.Sprintf("%s%s%s", op2.Value, token.Value, op1.Value),
+				Sym:          token.Sym,
+				BindingPower: token.BindingPower})
 		case "d":
 			//infix dice
 			op1 := s.Pop().(*AST)
 			op2 := s.Pop().(*AST)
 			s.Push(&AST{
-				value:        fmt.Sprintf("%s%s%s(%%s)", op2.value, token.value, op1.value),
-				sym:          token.sym,
-				bindingPower: token.bindingPower})
+				Value:        fmt.Sprintf("%s%s%s(%%s)", op2.Value, token.Value, op1.Value),
+				Sym:          token.Sym,
+				BindingPower: token.BindingPower})
 		case "(NUMBER)":
 			//operand
 			s.Push(token)
@@ -100,18 +100,18 @@ func ReStringAST(t *AST) string {
 			//postfix
 			post.Push(token)
 		case "{":
-			buff.WriteString(token.value + " ")
-			post.Push(&AST{value: "}"})
+			buff.WriteString(token.Value + " ")
+			post.Push(&AST{Value: "}"})
 		default:
 			//prefix
-			buff.WriteString(token.value + " ")
+			buff.WriteString(token.Value + " ")
 		}
 	}
 	for !s.Empty() {
-		buff.WriteString(", " + s.Pop().(*AST).value)
+		buff.WriteString(", " + s.Pop().(*AST).Value)
 	}
 	for !post.Empty() {
-		buff.WriteString(" " + post.Pop().(*AST).value)
+		buff.WriteString(" " + post.Pop().(*AST).Value)
 	}
 	//fmt.Printf("postStack:" + stringPostfix(&post))
 
@@ -121,7 +121,7 @@ func ReStringAST(t *AST) string {
 func stringPostfix(s *Stack) string {
 	var buf bytes.Buffer
 	for !s.Empty() {
-		buf.WriteString(s.Pop().(*AST).value + ", ")
+		buf.WriteString(s.Pop().(*AST).Value + ", ")
 
 	}
 	buf.WriteRune('\n')
@@ -131,24 +131,24 @@ func stringPostfix(s *Stack) string {
 func shuntBinary(token *AST, s *Stack, spacer string) {
 	op1 := s.Pop().(*AST)
 	op2 := s.Pop().(*AST)
-	if token.bindingPower > op1.bindingPower {
+	if token.BindingPower > op1.BindingPower {
 		s.Push(&AST{
-			value:        fmt.Sprintf("(%s%s%s%s%s)", op2.value, spacer, token.value, spacer, op1.value),
-			sym:          "(COMPOUND)",
-			bindingPower: token.bindingPower})
+			Value:        fmt.Sprintf("(%s%s%s%s%s)", op2.Value, spacer, token.Value, spacer, op1.Value),
+			Sym:          "(COMPOUND)",
+			BindingPower: token.BindingPower})
 	} else {
 		s.Push(&AST{
-			value:        fmt.Sprintf("%s%s%s%s%s", op2.value, spacer, token.value, spacer, op1.value),
-			sym:          "(COMPOUND)",
-			bindingPower: token.bindingPower})
+			Value:        fmt.Sprintf("%s%s%s%s%s", op2.Value, spacer, token.Value, spacer, op1.Value),
+			Sym:          "(COMPOUND)",
+			BindingPower: token.BindingPower})
 	}
 }
 func shuntUnary(token *AST, s *Stack) {
 	op1 := s.Pop().(*AST)
 	s.Push(&AST{
-		value:        fmt.Sprintf("%s%s", token.value, op1.value),
-		sym:          "(COMPOUND)",
-		bindingPower: token.bindingPower})
+		Value:        fmt.Sprintf("%s%s", token.Value, op1.Value),
+		Sym:          "(COMPOUND)",
+		BindingPower: token.BindingPower})
 
 }
 
@@ -157,8 +157,8 @@ func shuntPostfix(token *AST, s *Stack) {
 }
 
 func emitTokens(ch chan *AST, t *AST) {
-	if len(t.children) > 0 {
-		for _, c := range t.children {
+	if len(t.Children) > 0 {
+		for _, c := range t.Children {
 			emitTokens(ch, c)
 		}
 	}
@@ -169,25 +169,25 @@ func emitTokens(ch chan *AST, t *AST) {
 func (token *AST) String() string {
 	var buf bytes.Buffer
 	var preStack, postStack, s, reverse Stack
-	if len(token.children) > 0 {
+	if len(token.Children) > 0 {
 		token.inverseShuntingYard(&buf, &preStack, &postStack, &s, "", 0)
 		for !preStack.Empty() {
 			reverse.Push(preStack.Pop())
 		}
 		for !reverse.Empty() {
-			buf.WriteString(reverse.Pop().(*AST).value + " ")
+			buf.WriteString(reverse.Pop().(*AST).Value + " ")
 		}
 		for !s.Empty() {
 			reverse.Push(s.Pop())
 		}
 		for !reverse.Empty() {
-			buf.WriteString(reverse.Pop().(*AST).value + " ")
+			buf.WriteString(reverse.Pop().(*AST).Value + " ")
 		}
 		for !postStack.Empty() {
 			reverse.Push(postStack.Pop())
 		}
 		for !reverse.Empty() {
-			buf.WriteString(reverse.Pop().(*AST).value + " ")
+			buf.WriteString(reverse.Pop().(*AST).Value + " ")
 		}
 	}
 	return buf.String()
@@ -216,32 +216,32 @@ func (token *AST) String() string {
 //
 // Good luck and Godspeed.
 func (token *AST) inverseShuntingYard(buff *bytes.Buffer, preStack *Stack, postStack *Stack, s *Stack, lastSym string, childNum int) {
-	if len(token.children) > 0 {
-		for i, c := range token.children {
-			c.inverseShuntingYard(buff, preStack, postStack, s, token.sym, i)
-			if s.Top().(*AST).sym == "(COMPOUND)" {
+	if len(token.Children) > 0 {
+		for i, c := range token.Children {
+			c.inverseShuntingYard(buff, preStack, postStack, s, token.Sym, i)
+			if s.Top().(*AST).Sym == "(COMPOUND)" {
 				for !postStack.Empty() {
 					left := s.Pop().(*AST)
 					s.Push(&AST{
-						value:        fmt.Sprintf("%s %s", left.value, postStack.Pop().(*AST).value),
-						sym:          "(COMPOUND)",
-						bindingPower: token.bindingPower})
+						Value:        fmt.Sprintf("%s %s", left.Value, postStack.Pop().(*AST).Value),
+						Sym:          "(COMPOUND)",
+						BindingPower: token.BindingPower})
 				}
 			}
 			for !preStack.Empty() {
 				right := s.Pop().(*AST)
 				pre := preStack.Pop().(*AST)
 				s.Push(&AST{
-					value:        fmt.Sprintf("%s %s", pre.value, right.value),
-					sym:          "(COMPOUND)",
-					bindingPower: token.bindingPower})
+					Value:        fmt.Sprintf("%s %s", pre.Value, right.Value),
+					Sym:          "(COMPOUND)",
+					BindingPower: token.BindingPower})
 			}
 		}
 	}
-	switch sym := token.sym; sym {
+	switch sym := token.Sym; sym {
 	case "-":
 		//fucking unary operators
-		if len(token.children) == 1 {
+		if len(token.Children) == 1 {
 			shuntUnary(token, s)
 		} else {
 			shuntBinary(token, s, " ")
@@ -253,9 +253,9 @@ func (token *AST) inverseShuntingYard(buff *bytes.Buffer, preStack *Stack, postS
 		op1 := s.Pop().(*AST)
 		op2 := s.Pop().(*AST)
 		s.Push(&AST{
-			value:        fmt.Sprintf("%s%s%s", op2.value, token.value, op1.value),
-			sym:          token.sym,
-			bindingPower: token.bindingPower})
+			Value:        fmt.Sprintf("%s%s%s", op2.Value, token.Value, op1.Value),
+			Sym:          token.Sym,
+			BindingPower: token.BindingPower})
 	case "d":
 		//infix dice
 		op1 := s.Pop().(*AST)
@@ -267,9 +267,9 @@ func (token *AST) inverseShuntingYard(buff *bytes.Buffer, preStack *Stack, postS
 			sym = "(COMPOUND)"
 		}
 		s.Push(&AST{
-			value:        fmt.Sprintf("%s%s%s(%%s)", op2.value, token.value, op1.value),
-			sym:          sym,
-			bindingPower: token.bindingPower})
+			Value:        fmt.Sprintf("%s%s%s(%%s)", op2.Value, token.Value, op1.Value),
+			Sym:          sym,
+			BindingPower: token.BindingPower})
 	case "(NUMBER)":
 		//operand
 		s.Push(token)
@@ -279,9 +279,9 @@ func (token *AST) inverseShuntingYard(buff *bytes.Buffer, preStack *Stack, postS
 	case "{":
 		preStack.Push(token)
 		if lastSym == "if" && childNum == 1 {
-			postStack.Push(&AST{value: "else"})
+			postStack.Push(&AST{Value: "else"})
 		}
-		postStack.Push(&AST{value: "}"})
+		postStack.Push(&AST{Value: "}"})
 	case "if":
 		preStack.Push(token)
 	default:
@@ -291,26 +291,26 @@ func (token *AST) inverseShuntingYard(buff *bytes.Buffer, preStack *Stack, postS
 }
 
 func (t *AST) eval(ds *DiceSet) (float64, *DiceSet, error) {
-	switch t.sym {
+	switch t.Sym {
 	case "(NUMBER)":
-		i, _ := strconv.ParseFloat(t.value, 64)
-		if len(t.children) > 0 {
+		i, _ := strconv.ParseFloat(t.Value, 64)
+		if len(t.Children) > 0 {
 			//grab any color below, get it on ds
-			t.children[0].eval(ds)
+			t.Children[0].eval(ds)
 		}
 		return i, ds, nil
 	case "-H", "-L":
 		var sum, z float64
 		var err error
 
-		for _, c := range t.children {
+		for _, c := range t.Children {
 			z, ds, err = c.eval(ds)
 			if err != nil {
 				return 0, ds, err
 			}
 			sum += z
 		}
-		switch t.sym {
+		switch t.Sym {
 		case "-H":
 			ds.dropHighest = int64(sum)
 		case "-L":
@@ -320,10 +320,10 @@ func (t *AST) eval(ds *DiceSet) (float64, *DiceSet, error) {
 	case "d":
 		dice := Dice{}
 		var nums []int64
-		for i := 0; i < len(t.children); i++ {
+		for i := 0; i < len(t.Children); i++ {
 			var num float64
 			var err error
-			num, ds, err = t.children[i].eval(ds)
+			num, ds, err = t.Children[i].eval(ds)
 			if err != nil {
 				return 0, nil, err
 			}
@@ -338,14 +338,14 @@ func (t *AST) eval(ds *DiceSet) (float64, *DiceSet, error) {
 
 		return float64(res), ds, err
 	case "+", "-", "*", "/", "^":
-		x, ds, err := t.preformArithmitic(ds, t.sym)
+		x, ds, err := t.preformArithmitic(ds, t.Sym)
 		if err != nil {
 			return 0, ds, err
 		}
 		return x, ds, nil
 	case "{", "roll":
 		var x float64
-		for _, c := range t.children {
+		for _, c := range t.Children {
 			y, ds, err := c.eval(ds)
 			if err != nil {
 				return 0, ds, err
@@ -354,22 +354,22 @@ func (t *AST) eval(ds *DiceSet) (float64, *DiceSet, error) {
 		}
 		return x, ds, nil
 	case "(IDENT)":
-		ds.PushColor(t.value)
+		ds.PushColor(t.Value)
 		return 0, ds, nil
 	case "if":
-		res, ds, err := t.children[0].evaluateBoolean(ds)
+		res, ds, err := t.Children[0].evaluateBoolean(ds)
 		if err != nil {
 			return 0, ds, err
 		}
 		fmt.Print(res, " ")
 		var c *AST
 		if res {
-			c = t.children[1]
+			c = t.Children[1]
 		} else {
-			if len(t.children) < 3 {
+			if len(t.Children) < 3 {
 				return 0, ds, nil
 			}
-			c = t.children[2]
+			c = t.Children[2]
 		}
 		var x float64
 		//Evaluate chosen child
@@ -380,21 +380,21 @@ func (t *AST) eval(ds *DiceSet) (float64, *DiceSet, error) {
 		x += y
 		return x, ds, nil
 	default:
-		return 0, ds, fmt.Errorf("Unsupported symbol: %s", t.sym)
+		return 0, ds, fmt.Errorf("Unsupported symbol: %s", t.Sym)
 	}
 }
 
 func (t *AST) preformArithmitic(ds *DiceSet, op string) (float64, *DiceSet, error) {
 	//arithmitic is always binary
 	//...except for the "-" unary operator
-	if len(t.children) < 2 {
+	if len(t.Children) < 2 {
 
 	}
 	diceCount := len(ds.Dice)
 	var nums []float64
 	ds.colorDepth++
-	for _, c := range t.children {
-		switch c.sym {
+	for _, c := range t.Children {
+		switch c.Sym {
 		case "(IDENT)":
 			_, ds, err := c.eval(ds)
 			if err != nil {
@@ -457,15 +457,15 @@ func (t *AST) preformArithmitic(ds *DiceSet, op string) (float64, *DiceSet, erro
 	return x, ds, nil
 }
 func (t *AST) evaluateBoolean(ds *DiceSet) (bool, *DiceSet, error) {
-	left, ds, err := t.children[0].eval(ds)
+	left, ds, err := t.Children[0].eval(ds)
 	if err != nil {
 		return false, ds, err
 	}
-	right, ds, err := t.children[1].eval(ds)
+	right, ds, err := t.Children[1].eval(ds)
 	if err != nil {
 		return false, ds, err
 	}
-	switch t.sym {
+	switch t.Sym {
 	case ">":
 		return left > right, ds, nil
 	case "<":
