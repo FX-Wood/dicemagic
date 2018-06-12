@@ -1,7 +1,6 @@
 package main
 
 import (
-	"bytes"
 	"context"
 	"crypto/md5"
 	"encoding/hex"
@@ -10,6 +9,7 @@ import (
 	"math/big"
 	"math/rand"
 	"net/http"
+	"strconv"
 
 	"github.com/aasmall/dicemagic/dicelang"
 
@@ -43,26 +43,19 @@ func SlackRollHandler(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "This is not the droid you're looking for.")
 		return
 	}
-	content := fmt.Sprintf("roll %s", r.FormValue("text"))
+	content := r.FormValue("text")
 	stmts, err := dicelang.NewParser(content).Statements()
 	if err != nil {
 		printErrorToSlack(ctx, err, w, r)
 		return
 	}
-	totalsMap, dice, err := dicelang.GetDiceSets(stmts...)
-	if err != nil {
-		printErrorToSlack(ctx, err, w, r)
-		return
-	}
 	slackRollResponse := SlackRollJSONResponse{}
-	attachment := Attachment{
-		Fields: []Field{
-			{Title: "foo", Value: "bar"}}}
+	attachments, err := createSlackAttachments(stmts...)
 	if err != nil {
 		printErrorToSlack(ctx, err, w, r)
 		return
 	}
-	slackRollResponse.Attachments = append(slackRollResponse.Attachments, attachment)
+	slackRollResponse.Attachments = append(slackRollResponse.Attachments, attachments...)
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(slackRollResponse)
@@ -80,67 +73,34 @@ func rollDecisionToSlackAttachment(decision *roll.RollDecision) (Attachment, err
 	return attachment, nil
 }
 
-func createSlackAttachment(totalsMap map[string]float64, dice []dicelang.Dice) (Attachment, error) {
-
+func createSlackAttachments(stmts ...*dicelang.AST) ([]Attachment, error) {
+	var attachments []Attachment
+	var fields []Field
+	for _, stmt := range stmts {
+		total, dice, err := stmt.GetDiceSet()
+		if err != nil {
+			return nil, err
+		}
+		var faces []interface{} //will be variadic
+		for _, d := range dice.Dice {
+			faces = append(faces, dicelang.FacesSliceString(d.Faces))
+			field := Field{Title: d.Color, Value: strconv.FormatInt(d.Total, 10), Short: true}
+			fields = append(fields, field)
+		}
+		attachment := Attachment{
+			Fallback:   dicelang.TotalsMapString(dice.TotalsByColor),
+			AuthorName: fmt.Sprintf(stmt.String(), faces...),
+			Color:      stringToColor(stmt.String())}
+		if len(dice.Dice) > 1 {
+			field := Field{Title: "Total", Value: strconv.FormatFloat(total, 'f', -1, 64), Short: true}
+			fields = append(fields, field)
+		}
+		attachment.Fields = append(attachment.Fields, fields...)
+		attachments = append(attachments, attachment)
+	}
+	return attachments, nil
 }
 
-func rollExpressionToSlackAttachment(expression *roll.RollExpression) (Attachment, error) {
-	rollTotals := expression.RollTotals
-	attachment := Attachment{
-		Fallback:   expression.TotalsString(),
-		AuthorName: expression.FormattedString(),
-		Color:      stringToColor(expression.InitialText)}
-
-	totalRoll := int64(0)
-	allUnspecified := true
-	rollCount := 0
-	for _, e := range rollTotals {
-		if e.RollType != "" {
-			allUnspecified = false
-		}
-		rollCount++
-	}
-	field := Field{}
-	if allUnspecified {
-		for _, e := range rollTotals {
-			totalRoll += e.RollResult
-		}
-		field = Field{Title: fmt.Sprintf("%d", totalRoll), Short: false}
-		attachment.Fields = append(attachment.Fields, field)
-	} else {
-		for _, total := range rollTotals {
-			totalRoll += total.RollResult
-			var fieldTitle string
-			if total.RollType == "" {
-				fieldTitle = "_Unspecified_"
-			} else {
-				fieldTitle = total.RollType
-			}
-			field := Field{
-				Title: fmt.Sprintf("%s: %d", fieldTitle, total.RollResult),
-				Value: fmt.Sprintf("Rolls: %s", roll.Int64SliceToCSV(total.Faces...)),
-				Short: true}
-			attachment.Fields = append(attachment.Fields, field)
-		}
-		if rollCount > 1 {
-			field = Field{Title: fmt.Sprintf("For a total of: %d", totalRoll), Short: false}
-			attachment.Fields = append(attachment.Fields, field)
-		}
-	}
-
-	return attachment, nil
-}
-func createAttachmentsDamageString(rollTotals []roll.Total) string {
-	var buffer bytes.Buffer
-	for _, e := range rollTotals {
-		if e.RollType == "" {
-			buffer.WriteString(fmt.Sprintf("%d ", e.RollResult))
-		} else {
-			buffer.WriteString(fmt.Sprintf("%d of type %s ", e.RollResult, e.RollType))
-		}
-	}
-	return buffer.String()
-}
 func printErrorToSlack(ctx context.Context, err error, w http.ResponseWriter, r *http.Request) {
 	slackRollResponse := new(SlackRollJSONResponse)
 	slackRollResponse.Text = err.Error()

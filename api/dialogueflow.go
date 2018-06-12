@@ -10,6 +10,7 @@ import (
 	"strings"
 
 	"github.com/aasmall/dicemagic/dicelang"
+
 	"github.com/aasmall/dicemagic/roll"
 	"go.opencensus.io/trace"
 
@@ -163,6 +164,7 @@ func DialogueWebhookHandler(w http.ResponseWriter, r *http.Request) {
 		handleRollIntent(ctx, *dialogueFlowRequest, w, r)
 	case "decide":
 		//handleDecideIntent(ctx, *dialogueFlowRequest, w, r)
+		handleDefaultIntent(ctx, *dialogueFlowRequest, w, r)
 	case "command":
 		handleCommandIntent(ctx, *dialogueFlowRequest, w, r)
 	case "remember":
@@ -241,58 +243,27 @@ func handleCommandIntent(ctx context.Context, dialogueFlowRequest DialogueFlowRe
 
 }
 func handleRollCommand(ctx context.Context, command roll.RollCommand, w http.ResponseWriter, r *http.Request) {
+	//DialogFlow API Wrapper
 	dialogueFlowResponse := new(DialogueFlowResponse)
 
+	//Custom Slack Payload
 	slackRollResponse := SlackRollJSONResponse{}
-
-	googleAssistantRollResponse := AssistantResponse{}
-	googleAssistantRollResponse.RichResponse = RichResponse{}
-
-	var formattedText bytes.Buffer
-
-	t := float64(0)
-	var maps []map[string]float64
-	var dice []dicelang.Dice
-	for i := 0; i < len(command.RollExpresions); i++ {
-		// Roll all the dice!
-		total, ds, err := command.RollExpresions[i].GetDiceSet()
-		maps = append(maps, ds.TotalsByColor)
-		for _, d := range ds.Dice {
-			dice = append(dice, d)
-		}
-		d := dicelang.DiceSet{}
-		t += total
+	attachments, err := createSlackAttachments(command.RollExpresions...)
+	if err != nil {
+		printErrorToDialogFlow(ctx, err, w, r)
+		return
 	}
-	totalsMap := dicelang.MergeDiceTotalMaps(maps...)
-	for k, v := range totalsMap {
-		var s string
-		if k == "" {
-			s = "unspecified"
-		} else {
-			s = k
-		}
-		formattedText.WriteString(fmt.Sprintf("%s: %.2f \n", s, v))
-	}
-	formattedText.Truncate(len(formattedText.String()) - 2)
-
-	simpleResponseItem := SimpleResponseItem{}
-	if len(command.RollExpresions) > 1 {
-		simpleResponseItem.SimpleResponse.TextToSpeech = "Rolling."
-	} else {
-		simpleResponseItem.SimpleResponse.TextToSpeech = fmt.Sprintf("You rolled %d", t)
-	}
-	googleAssistantRollResponse.RichResponse.Items = append(googleAssistantRollResponse.RichResponse.Items, simpleResponseItem)
-
-	basicCardItem := BasicCardItem{}
-	basicCardItem.BasicCard.Title = "results"
-	basicCardItem.BasicCard.FormattedText = formattedText.String()
-	googleAssistantRollResponse.RichResponse.Items = append(googleAssistantRollResponse.RichResponse.Items, basicCardItem)
-
-	dialogueFlowResponse.FulfillmentText = formattedText.String()
-	dialogueFlowResponse.Payload.Google = googleAssistantRollResponse
+	slackRollResponse.Attachments = attachments
 	dialogueFlowResponse.Payload.Slack = slackRollResponse
 
-	log.Debugf(ctx, "RichResponse: %+v", googleAssistantRollResponse.RichResponse)
+	//Generic response
+	fulfulmentText, err := createDialogFlowFulfillmentText(command.RollExpresions...)
+	if err != nil {
+		printErrorToDialogFlow(ctx, err, w, r)
+		return
+	}
+	dialogueFlowResponse.FulfillmentText = fulfulmentText
+
 	//Send Response
 	w.Header().Set("Content-Type", "application/json")
 
@@ -325,6 +296,25 @@ func handleRollIntent(ctx context.Context, dialogueFlowRequest DialogueFlowReque
 	}
 	handleRollCommand(ctx, command, w, r)
 
+}
+
+func createDialogFlowFulfillmentText(stmts ...*dicelang.AST) (string, error) {
+	var b [][]byte
+	var t float64
+	for _, stmt := range stmts {
+		total, dice, err := stmt.GetDiceSet()
+		if err != nil {
+			return "", err
+		}
+		var faces []interface{} //will be variadic
+		for _, d := range dice.Dice {
+			faces = append(faces, dicelang.FacesSliceString(d.Faces))
+		}
+		b = append(b, []byte(fmt.Sprintf(stmt.String(), faces...)))
+		t += total
+	}
+
+	return string(bytes.Join(b, []byte("\n"))), nil
 }
 
 func printErrorToDialogFlow(ctx context.Context, err error, w http.ResponseWriter, r *http.Request) {

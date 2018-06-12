@@ -392,7 +392,7 @@ func getTokenRegistry() *tokenRegistry {
 	t.infix("==", 30)
 	t.infix("!=", 30)
 
-	t.infixLed("(IDENT)", 100, func(t *AST, p *Parser, left *AST) (*AST, error) {
+	t.infixLed("(IDENT)", 300, func(t *AST, p *Parser, left *AST) (*AST, error) {
 		t.value = strings.Title(t.value)
 		left.children = append(left.children, t)
 		return left, nil

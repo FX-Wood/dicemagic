@@ -12,20 +12,21 @@ import (
 
 func main() {
 	var path, cmd string
-	var verbose bool
+	var verbose, prob bool
 	flag.StringVar(&path, "path", "", "Path to a file with one roll command per line.")
 	flag.StringVar(&cmd, "cmd", "roll 1d20", "Roll command")
-	flag.BoolVar(&verbose, "v", false, "Display ast and probability map for each statement")
+	flag.BoolVar(&verbose, "v", false, "Display ast for each statement")
+	flag.BoolVar(&prob, "p", false, "Display probability map for each statement")
 	flag.Parse()
 	if path == "" {
 		fmt.Println(cmd)
-		printDiceInfo(cmd, verbose)
+		printDiceInfo(cmd, verbose, prob)
 	} else {
 		c := make(chan string)
 		go readRollsFromFile(c, path)
 		for cmd := range c {
 			fmt.Println(cmd)
-			printDiceInfo(cmd, verbose)
+			printDiceInfo(cmd, verbose, prob)
 		}
 	}
 }
@@ -39,7 +40,7 @@ func sortProbMap(m map[int64]float64) []int64 {
 	return keys
 }
 
-func printDiceInfo(cmd string, verbose bool) {
+func printDiceInfo(cmd string, verbose bool, prob bool) {
 	var p *dicelang.Parser
 	p = dicelang.NewParser(cmd)
 	stmts, err := p.Statements()
@@ -57,8 +58,10 @@ func printDiceInfo(cmd string, verbose bool) {
 		if verbose {
 			fmt.Print("AST:\n----------")
 			dicelang.PrintAST(stmt, 0)
-			fmt.Printf("%#v", stmt)
 			fmt.Print("\n----------")
+
+		}
+		if prob {
 			for _, v := range diceSet.Dice {
 				probMap := dicelang.DiceProbability(v.Count, v.Sides, v.DropHighest, v.DropLowest)
 				keys := sortProbMap(probMap)
@@ -71,7 +74,8 @@ func printDiceInfo(cmd string, verbose bool) {
 		}
 		fmt.Printf("Total: %+v\n", total)
 		fmt.Printf("Color Map: %+v\n", diceSet.TotalsByColor)
-		pre := dicelang.ReStringAST(stmt)
+		//pre := dicelang.ReStringAST(stmt)
+		pre := stmt.String()
 		fmt.Println(pre)
 		fmt.Println("----------")
 	}
