@@ -328,9 +328,8 @@ func (t *AST) eval(ds *DiceSet) (float64, *DiceSet, error) {
 			if err != nil {
 				return 0, nil, err
 			}
-			if num != 0 {
-				nums = append(nums, int64(num))
-			}
+			nums = append(nums, int64(num))
+
 		}
 		dice.Count = nums[0]
 		dice.Sides = nums[1]

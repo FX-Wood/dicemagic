@@ -20,7 +20,7 @@
             "host": "127.0.0.1",
             "program": "${fileDirname}",
             "env": {},
-            "args": ["-cmd=if(1d4>2){roll 10d12+(1d4)d8-L Fire}else{roll 1d4}","-v" ],
+            "args": ["-cmd=roll 1d1+5 fire and 3d0 +2mundane","-v" ],
             "showLog": true
         }
     ]

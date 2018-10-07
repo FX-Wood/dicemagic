@@ -84,7 +84,17 @@ func createSlackAttachments(stmts ...*dicelang.AST) ([]Attachment, error) {
 		var faces []interface{} //will be variadic
 		for _, d := range dice.Dice {
 			faces = append(faces, dicelang.FacesSliceString(d.Faces))
-			field := Field{Title: d.Color, Value: strconv.FormatInt(d.Total, 10), Short: true}
+		}
+		for k, v := range dice.TotalsByColor {
+			var fieldTitle string
+			if k == "" && len(dice.TotalsByColor) == 1 {
+				fieldTitle = ""
+			} else if k == "" {
+				fieldTitle = "Unspecified"
+			} else {
+				fieldTitle = k
+			}
+			field := Field{Title: fieldTitle, Value: strconv.FormatFloat(v, 'f', -1, 64), Short: true}
 			fields = append(fields, field)
 		}
 		attachment := Attachment{
@@ -92,7 +102,7 @@ func createSlackAttachments(stmts ...*dicelang.AST) ([]Attachment, error) {
 			AuthorName: fmt.Sprintf(stmt.String(), faces...),
 			Color:      stringToColor(stmt.String())}
 		if len(dice.Dice) > 1 {
-			field := Field{Title: "Total", Value: strconv.FormatFloat(total, 'f', -1, 64), Short: true}
+			field := Field{Title: "Total", Value: strconv.FormatFloat(total, 'f', -1, 64), Short: false}
 			fields = append(fields, field)
 		}
 		attachment.Fields = append(attachment.Fields, fields...)

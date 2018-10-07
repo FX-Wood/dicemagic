@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"html"
 	"net/http"
 	"net/http/httputil"
 	"strings"
@@ -81,11 +82,8 @@ type DialogueFlowResponse struct {
 	FulfillmentText     string                         `json:"fulfillmentText,omitempty"`
 	FulfillmentMessages []DialogFlowFulfillmentMessage `json:"fulfillmentMessages,omitempty"`
 	Source              string                         `json:"source,omitempty"`
-	Payload             struct {
-		Slack  SlackRollJSONResponse `json:"slack,omitempty"`
-		Google AssistantResponse     `json:"google,omitempty"`
-	} `json:"payload,omitempty"`
-	OutputContexts []struct {
+	Payload             *DialogFlowPayload             `json:"payload,omitempty"`
+	OutputContexts      []struct {
 		Name          string `json:"name,omitempty"`
 		LifespanCount int    `json:"lifespanCount,omitempty"`
 		Parameters    struct {
@@ -99,6 +97,10 @@ type DialogueFlowResponse struct {
 			Param string `json:"param,omitempty"`
 		} `json:"parameters,omitempty"`
 	} `json:"followupEventInput,omitempty"`
+}
+type DialogFlowPayload struct {
+	Slack  *SlackRollJSONResponse `json:"slack,omitempty"`
+	Google *AssistantResponse     `json:"google,omitempty"`
 }
 
 //AssistantResponse represents a response that will be sent to Dialogflow for Google Actions API
@@ -160,7 +162,7 @@ func DialogueWebhookHandler(w http.ResponseWriter, r *http.Request) {
 
 	//switch on Intent
 	switch strings.ToLower(dialogueFlowRequest.QueryResult.Intent.DisplayName) {
-	case "roll":
+	case "roll", "interactive - roll":
 		handleRollIntent(ctx, *dialogueFlowRequest, w, r)
 	case "decide":
 		//handleDecideIntent(ctx, *dialogueFlowRequest, w, r)
@@ -212,7 +214,9 @@ func handleRememberIntent(ctx context.Context, dialogueFlowRequest DialogueFlowR
 	var attachment Attachment
 	attachment.AuthorName = fmt.Sprintf("Saved %s", commandName)
 	slackRollResponse.Attachments = append(slackRollResponse.Attachments, attachment)
-	dialogueFlowResponse.Payload.Slack = slackRollResponse
+	payload := new(DialogFlowPayload)
+	payload.Slack = &slackRollResponse
+	dialogueFlowResponse.Payload = payload
 
 	//Send Response
 	w.Header().Set("Content-Type", "application/json")
@@ -254,7 +258,9 @@ func handleRollCommand(ctx context.Context, command roll.RollCommand, w http.Res
 		return
 	}
 	slackRollResponse.Attachments = attachments
-	dialogueFlowResponse.Payload.Slack = slackRollResponse
+	payload := new(DialogFlowPayload)
+	payload.Slack = &slackRollResponse
+	dialogueFlowResponse.Payload = payload
 
 	//Generic response
 	fulfulmentText, err := createDialogFlowFulfillmentText(command.RollExpresions...)
@@ -276,14 +282,14 @@ func handleRollIntent(ctx context.Context, dialogueFlowRequest DialogueFlowReque
 	var command roll.RollCommand
 	var diceStrings []string
 	for i := 0; i < diceExpressionCount; i++ {
-		diceExpressionString := addMissingCloseParens(dialogueFlowRequest.QueryResult.Parameters["DiceExpression"].([]interface{})[i].(string))
+		diceExpressionString := html.UnescapeString(addMissingCloseParens(dialogueFlowRequest.QueryResult.Parameters["DiceExpression"].([]interface{})[i].(string)))
 		// add ROLL identifier for parser
 		if !strings.Contains(strings.ToUpper(diceExpressionString), "ROLL") {
 			diceExpressionString = fmt.Sprintf("roll %s", diceExpressionString)
 		}
 		diceStrings = append(diceStrings, diceExpressionString)
 	}
-	command.FromString(diceStrings...)
+	command.FromString(html.UnescapeString(dialogueFlowRequest.QueryResult.QueryText))
 
 	//Save for replay
 	command.ID = roll.HashStrings("!!",
@@ -331,6 +337,10 @@ func addMissingCloseParens(text string) string {
 	}
 	if strings.Count(text, "]") < strings.Count(text, "[") {
 		text += "]"
+		return addMissingCloseParens(text)
+	}
+	if strings.Count(text, "}") < strings.Count(text, "{") {
+		text += "}"
 		return addMissingCloseParens(text)
 	}
 	return text

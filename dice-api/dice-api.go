@@ -1,25 +1,22 @@
 package main
 
 import (
+	"context"
 	"fmt"
+	"log"
 	"net/http"
 
-	"log"
-
 	"cloud.google.com/go/logging"
-	"golang.org/x/net/context"
-	"google.golang.org/appengine"
 )
 
 func main() {
-	http.HandleFunc("/slack/roll/", SlackRollHandler)
-	http.HandleFunc("/dflow/", DialogueWebhookHandler)
-	http.HandleFunc("/chart/", drawChart)
+	http.HandleFunc("/dice-api", DiceAPIHandler)
 
 	ctx := context.Background()
 
 	// Sets your Google Cloud Platform project ID.
-	projectID := "dice-magic-dev"
+	projectID := "k8s-dice-magic"
+	redirectURL := "https://www.smallnet.org/"
 
 	// Creates a client.
 	client, err := logging.NewClient(ctx, projectID)
@@ -33,19 +30,13 @@ func main() {
 
 	Debuglogger := client.Logger(logName).StandardLogger(logging.Debug)
 
-	// Logs "hello world", log entry is visible at
-	// Stackdriver Logs.
-
 	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		wwwHost, _ := appengine.ModuleHostname(ctx, "www", "", "")
-		var redirectURL string
-		if appengine.IsDevAppServer() {
-			redirectURL = fmt.Sprintf("//%s/%s", wwwHost, r.URL.Path)
-		} else {
-			redirectURL = fmt.Sprintf("https://www.%s%s", r.Host, r.URL.Path)
-		}
 		Debuglogger.Printf("Redirecting to: %s", redirectURL)
 		http.Redirect(w, r, redirectURL, 302)
 	})
 	log.Fatal(http.ListenAndServe(":8080", nil))
+}
+func DiceAPIHandler(w http.ResponseWriter, r *http.Request) {
+
+	fmt.Fprintf(w, "Hi there, I love %s!", r.URL.Path[1:])
 }
