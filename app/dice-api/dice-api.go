@@ -8,7 +8,7 @@ import (
 	"sort"
 
 	"cloud.google.com/go/logging"
-	"github.com/aasmall/dicemagic/dice-api/dicelang"
+	"github.com/aasmall/dicemagic/app/dicelang"
 )
 
 func main() {
