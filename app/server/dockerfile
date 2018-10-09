@@ -4,7 +4,7 @@ RUN apk add --no-cache git mercurial \
     && go get cloud.google.com/go/logging \
     && go get github.com/aasmall/word2number \
     && go get github.com/wcharczuk/go-chart \
-    && go get gopkg.in/aasmall/dicemagic.k8s/app/proto \
+    && go get gopkg.in/aasmall/dicemagic/app/proto \
     && go get google.golang.org/grpc \
     && go get google.golang.org/grpc/reflection \
     && apk del git mercurial
