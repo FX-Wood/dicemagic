@@ -1,9 +1,5 @@
 syntax = "proto3";
 
-option java_multiple_files = true;
-option java_package = "io.grpc.examples.dicemagic";
-option java_outer_classname = "DiceMagicProto";
-
 package proto;
 
 // The roller service definition.
