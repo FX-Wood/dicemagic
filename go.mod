@@ -1,4 +1,4 @@
-module github.com/aasmall/dicemagic
+module github.com/fx-wood/dicemagic
 
 go 1.12
 

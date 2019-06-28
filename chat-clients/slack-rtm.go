@@ -8,8 +8,8 @@ import (
 
 	"github.com/serialx/hashring"
 
-	"github.com/aasmall/dicemagic/internal/dicelang/errors"
-	pb "github.com/aasmall/dicemagic/internal/proto"
+	"github.com/fx-wood/dicemagic/internal/dicelang/errors"
+	pb "github.com/fx-wood/dicemagic/internal/proto"
 	"github.com/nlopes/slack"
 	"golang.org/x/net/context"
 )

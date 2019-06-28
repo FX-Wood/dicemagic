@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/aasmall/dicemagic/internal/dicelang/errors"
+	"github.com/fx-wood/dicemagic/internal/dicelang/errors"
 
 	"cloud.google.com/go/datastore"
 )

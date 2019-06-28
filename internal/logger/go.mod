@@ -1,4 +1,4 @@
-module github.com/aasmall/dicemagic/internal/logger
+module github.com/fx-wood/dicemagic/internal/logger
 
 go 1.12
 

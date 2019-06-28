@@ -1,12 +1,12 @@
-module github.com/aasmall/dicemagic/internal/dicelang/cli
+module github.com/fx-wood/dicemagic/internal/dicelang/cli
 
 go 1.12
 
 require (
-	github.com/aasmall/dicemagic/internal/dicelang v0.1.0
-	github.com/aasmall/dicemagic/internal/dicelang/errors v0.1.0
+	github.com/fx-wood/dicemagic/internal/dicelang v0.1.0
+	github.com/fx-wood/dicemagic/internal/dicelang/errors v0.1.0
 )
 
-replace github.com/aasmall/dicemagic/internal/dicelang v0.1.0 => ../
+replace github.com/fx-wood/dicemagic/internal/dicelang v0.1.0 => ../
 
-replace github.com/aasmall/dicemagic/internal/dicelang/errors v0.1.0 => ../errors
+replace github.com/fx-wood/dicemagic/internal/dicelang/errors v0.1.0 => ../errors

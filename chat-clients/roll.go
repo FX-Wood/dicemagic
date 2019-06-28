@@ -5,7 +5,7 @@ import (
 
 	"google.golang.org/grpc"
 
-	pb "github.com/aasmall/dicemagic/internal/proto"
+	pb "github.com/fx-wood/dicemagic/internal/proto"
 	"golang.org/x/net/context"
 )
 

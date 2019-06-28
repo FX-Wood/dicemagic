@@ -16,8 +16,8 @@ import (
 
 	"cloud.google.com/go/datastore"
 	"contrib.go.opencensus.io/exporter/stackdriver"
-	"github.com/aasmall/dicemagic/internal/handler"
-	log "github.com/aasmall/dicemagic/internal/logger"
+	"github.com/fx-wood/dicemagic/internal/handler"
+	log "github.com/fx-wood/dicemagic/internal/logger"
 	"github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"go.opencensus.io/plugin/ocgrpc"

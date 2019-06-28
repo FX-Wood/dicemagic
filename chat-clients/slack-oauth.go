@@ -9,7 +9,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/aasmall/dicemagic/internal/dicelang/errors"
+	"github.com/fx-wood/dicemagic/internal/dicelang/errors"
 )
 
 func SlackOAuthHandler(e interface{}, w http.ResponseWriter, r *http.Request) error {

@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"net/http"
 
-	"github.com/aasmall/dicemagic/internal/dicelang/errors"
-	"github.com/aasmall/dicemagic/internal/handler"
+	"github.com/fx-wood/dicemagic/internal/dicelang/errors"
+	"github.com/fx-wood/dicemagic/internal/handler"
 	"github.com/nlopes/slack"
 )
 

@@ -7,8 +7,8 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aasmall/dicemagic/internal/dicelang/errors"
-	pb "github.com/aasmall/dicemagic/internal/proto"
+	"github.com/fx-wood/dicemagic/internal/dicelang/errors"
+	pb "github.com/fx-wood/dicemagic/internal/proto"
 )
 
 type RESTRollResponse struct {

@@ -5,7 +5,7 @@ import (
 	"os"
 	"time"
 
-	pb "github.com/aasmall/dicemagic/app/proto"
+	pb "github.com/fx-wood/dicemagic/internal/proto"
 	"go.opencensus.io/plugin/ocgrpc"
 	"golang.org/x/net/context"
 	"google.golang.org/grpc"

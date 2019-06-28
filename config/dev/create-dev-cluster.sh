@@ -82,5 +82,5 @@ gcloud dns --project=${PROJECT_ID?} record-sets transaction add ${DNS_NAME}. --n
 gcloud dns --project=${PROJECT_ID?} record-sets transaction add ${DNS_NAME}. --name=www.${DNS_NAME}. --ttl=300 --type=CNAME --zone=dicemagic-dev
 gcloud dns --project=${PROJECT_ID?} record-sets transaction execute --zone=dicemagic-dev
 echo "----------------------------------------"
-echo "use IP: ${IP} to update ./k8s/overlays/dev-cluster/nginx-ingress-controller.yaml"
+echo "use IP: ${IP} to update ../k8s/overlays/dev-cluster/nginx-ingress-controller.yaml"
 echo "----------------------------------------"

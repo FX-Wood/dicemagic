@@ -20,8 +20,8 @@ import (
 	"google.golang.org/grpc"
 
 	"cloud.google.com/go/datastore"
-	log "github.com/aasmall/dicemagic/internal/logger"
-	pb "github.com/aasmall/dicemagic/internal/proto"
+	log "github.com/fx-wood/dicemagic/internal/logger"
+	pb "github.com/fx-wood/dicemagic/internal/proto"
 	"github.com/nlopes/slack"
 	"golang.org/x/net/context"
 )

@@ -1,16 +1,16 @@
-module github.com/aasmall/dicemagic/chat-clients
+module github.com/fx-wood/dicemagic/chat-clients
 
 go 1.12
 
 require (
 	cloud.google.com/go v0.36.0
 	contrib.go.opencensus.io/exporter/stackdriver v0.9.1
-	github.com/aasmall/dicemagic v0.0.0-20190306205428-6b9ac5ae3d91
-	github.com/aasmall/dicemagic/internal/dicelang v0.1.0
-	github.com/aasmall/dicemagic/internal/dicelang/errors v0.1.0
-	github.com/aasmall/dicemagic/internal/handler v0.1.0
-	github.com/aasmall/dicemagic/internal/logger v0.1.0
-	github.com/aasmall/dicemagic/internal/proto v0.1.0
+	github.com/fx-wood/dicemagic v0.0.0-20190306205428-6b9ac5ae3d91
+	github.com/fx-wood/dicemagic/internal/dicelang v0.1.0
+	github.com/fx-wood/dicemagic/internal/dicelang/errors v0.1.0
+	github.com/fx-wood/dicemagic/internal/handler v0.1.0
+	github.com/fx-wood/dicemagic/internal/logger v0.1.0
+	github.com/fx-wood/dicemagic/internal/proto v0.1.0
 	github.com/census-instrumentation/opencensus-proto v0.1.0 // indirect
 	github.com/go-redis/redis v6.15.2+incompatible
 	github.com/gorilla/mux v1.7.0
@@ -24,12 +24,12 @@ require (
 	google.golang.org/grpc v1.19.0
 )
 
-replace github.com/aasmall/dicemagic/internal/dicelang v0.1.0 => ../internal/dicelang
+replace github.com/fx-wood/dicemagic/internal/dicelang v0.1.0 => ../internal/dicelang
 
-replace github.com/aasmall/dicemagic/internal/dicelang/errors v0.1.0 => ../internal/dicelang/errors
+replace github.com/fx-wood/dicemagic/internal/dicelang/errors v0.1.0 => ../internal/dicelang/errors
 
-replace github.com/aasmall/dicemagic/internal/handler v0.1.0 => ../internal/handler
+replace github.com/fx-wood/dicemagic/internal/handler v0.1.0 => ../internal/handler
 
-replace github.com/aasmall/dicemagic/internal/logger v0.1.0 => ../internal/logger
+replace github.com/fx-wood/dicemagic/internal/logger v0.1.0 => ../internal/logger
 
-replace github.com/aasmall/dicemagic/internal/proto v0.1.0 => ../internal/proto
+replace github.com/fx-wood/dicemagic/internal/proto v0.1.0 => ../internal/proto

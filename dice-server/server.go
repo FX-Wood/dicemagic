@@ -11,10 +11,10 @@ import (
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 
-	"github.com/aasmall/dicemagic/internal/dicelang"
-	"github.com/aasmall/dicemagic/internal/dicelang/errors"
-	log "github.com/aasmall/dicemagic/internal/logger"
-	pb "github.com/aasmall/dicemagic/internal/proto"
+	"github.com/fx-wood/dicemagic/internal/dicelang"
+	"github.com/fx-wood/dicemagic/internal/dicelang/errors"
+	log "github.com/fx-wood/dicemagic/internal/logger"
+	pb "github.com/fx-wood/dicemagic/internal/proto"
 	"golang.org/x/net/context"
 
 	"go.opencensus.io/plugin/ocgrpc"

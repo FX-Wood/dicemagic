@@ -7,8 +7,8 @@ import (
 	"os"
 	"sort"
 
-	"github.com/aasmall/dicemagic/internal/dicelang"
-	"github.com/aasmall/dicemagic/internal/dicelang/errors"
+	"github.com/fx-wood/dicemagic/internal/dicelang"
+	"github.com/fx-wood/dicemagic/internal/dicelang/errors"
 )
 
 func main() {

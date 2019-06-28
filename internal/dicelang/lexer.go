@@ -8,7 +8,7 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/aasmall/dicemagic/app/dicelang/errors"
+	"github.com/fx-wood/dicemagic/internal/dicelang/errors"
 
 	"github.com/aasmall/word2number"
 )

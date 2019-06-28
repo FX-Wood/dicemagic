@@ -16,7 +16,7 @@ requires:
  - [Go](https://golang.org/doc/install)
  - [AppEngine default service account key.json](https://console.cloud.google.com/iam-admin/serviceaccounts/project)
  - Python 2.7  `sudo apt-get install python`
- - MagicDice in `$GOPATH/src/github.com/aasmall/`
+ - MagicDice in `$GOPATH/src/github.com/fx-wood/`
  - GOOGLE_APPLICATION_CREDENTIALS environment variable set
  - [AppEngine API Enabled] (https://console.cloud.google.com/apis/library/appengine.googleapis.com/)
 
@@ -32,7 +32,7 @@ $GOPATH
 ├── pkg
 └── src
     └── github.com
-        └── aasmall
+        └── fx-wood
             └── dicemagic
 ```
 
@@ -46,7 +46,7 @@ tar -xzf ~/sdk-tar.gz -C ~/
 . ~/google-cloud-sdk/path.bash.inc
 gcloud components update --quiet
 gcloud components install app-engine-go --quiet
-cd $GOPATH/src/github.com/aasmall/dicemagic
+cd $GOPATH/src/github.com/fx-wood/dicemagic
 go get -d -v -t ./... && go build -v ./...
 
 ```

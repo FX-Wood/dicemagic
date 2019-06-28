@@ -1,4 +1,4 @@
-module github.com/aasmall/dicemagic/internal/proto
+module github.com/fx-wood/dicemagic/internal/proto
 
 go 1.12
 

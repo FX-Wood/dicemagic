@@ -10,7 +10,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/aasmall/dicemagic/app/dicelang/errors"
+	"github.com/fx-wood/dicemagic/internal/dicelang/errors"
 )
 
 //Dice represents a a throw of a single type of die

@@ -12,14 +12,14 @@ steps:
             'build',
             '-t', 'gcr.io/$PROJECT_ID/chat-clients:latest',
             '--cache-from', 'gcr.io/$PROJECT_ID/chat-clients:latest',
-            './app/chat-clients'
+            './internal/chat-clients'
         ]
 - name: 'gcr.io/cloud-builders/docker'
   args: [
             'build',
             '-t', 'gcr.io/$PROJECT_ID/dice-server:latest',
             '--cache-from', 'gcr.io/$PROJECT_ID/dice-server:latest',
-            './app/dice-server'
+            './internal/dice-server'
         ]
 - name: 'gcr.io/cloud-builders/docker'
   args: [
