@@ -8,17 +8,17 @@ import (
 	"os"
 	"os/signal"
 	"strconv"
-	"strings"
+	// "strings"
 	"syscall"
 	"time"
 
 	"cloud.google.com/go/logging"
 
-	"cloud.google.com/go/datastore"
+	// "cloud.google.com/go/datastore"
 	"contrib.go.opencensus.io/exporter/stackdriver"
 	"github.com/aasmall/dicemagic/internal/handler"
 	log "github.com/aasmall/dicemagic/internal/logger"
-	"github.com/go-redis/redis"
+	// "github.com/go-redis/redis"
 	"github.com/gorilla/mux"
 	"go.opencensus.io/plugin/ocgrpc"
 	"go.opencensus.io/plugin/ochttp"
@@ -37,22 +37,22 @@ type env struct {
 
 type envConfig struct {
 	projectID             string
-	kmsKeyring            string
-	kmsSlackKey           string
-	kmsSlackKeyLocation   string
-	slackClientID         string
-	encSlackSigningSecret string
-	encSlackClientSecret  string
-	slackOAuthDeniedURL   string
+	// kmsKeyring            string
+	// kmsSlackKey           string
+	// kmsSlackKeyLocation   string
+	// slackClientID         string
+	// encSlackSigningSecret string
+	// encSlackClientSecret  string
+	// slackOAuthDeniedURL   string
 	logName               string
-	serverPort            string
+	chatClientServerPort  string
 	diceServerPort        string
-	slackTokenURL         string
-	slackAppID            string
-	redisPort             string
+	// slackTokenURL         string
+	// slackAppID            string
+	// redisPort             string
 	podName               string
-	localRedirectURI      string
-	redisClusterHosts     string
+	// localRedirectURI      string
+	// redisClusterHosts     string
 	debug                 bool
 	local                 bool
 	traceProbability      float64
@@ -67,22 +67,22 @@ func main() {
 	configReader := new(envReader)
 	config := &envConfig{
 		projectID:             configReader.getEnv("PROJECT_ID"),
-		kmsKeyring:            configReader.getEnv("KMS_KEYRING"),
-		kmsSlackKey:           configReader.getEnv("KMS_SLACK_KEY"),
-		kmsSlackKeyLocation:   configReader.getEnv("KMS_SLACK_KEY_LOCATION"),
-		slackClientID:         configReader.getEnv("SLACK_CLIENT_ID"),
-		slackAppID:            configReader.getEnv("SLACK_APP_ID"),
-		encSlackSigningSecret: configReader.getEnv("SLACK_SIGNING_SECRET"),
-		encSlackClientSecret:  configReader.getEnv("SLACK_CLIENT_SECRET"),
-		slackOAuthDeniedURL:   configReader.getEnv("SLACK_OAUTH_DENIED_URL"),
+		// kmsKeyring:            configReader.getEnv("KMS_KEYRING"),
+		// kmsSlackKey:           configReader.getEnv("KMS_SLACK_KEY"),
+		// kmsSlackKeyLocation:   configReader.getEnv("KMS_SLACK_KEY_LOCATION"),
+		// slackClientID:         configReader.getEnv("SLACK_CLIENT_ID"),
+		// slackAppID:            configReader.getEnv("SLACK_APP_ID"),
+		// encSlackSigningSecret: configReader.getEnv("SLACK_SIGNING_SECRET"),
+		// encSlackClientSecret:  configReader.getEnv("SLACK_CLIENT_SECRET"),
+		// slackOAuthDeniedURL:   configReader.getEnv("SLACK_OAUTH_DENIED_URL"),
 		logName:               configReader.getEnv("LOG_NAME"),
-		serverPort:            configReader.getEnv("SERVER_PORT"),
-		slackTokenURL:         configReader.getEnv("SLACK_TOKEN_URL"),
+		chatClientServerPort:  configReader.getEnv("CHAT_CLIENT_SERVER_PORT"),
+		// slackTokenURL:         configReader.getEnv("SLACK_TOKEN_URL"),
 		diceServerPort:        configReader.getEnv("DICE_SERVER_PORT"),
-		redisPort:             configReader.getEnv("REDIS_PORT"),
+		// redisPort:             configReader.getEnv("REDIS_PORT"),
 		podName:               configReader.getEnv("POD_NAME"),
-		localRedirectURI:      configReader.getEnvOpt("REDIRECT_URI"),
-		redisClusterHosts:     configReader.getEnvOpt("REDIS_CLUSTER_HOSTS"),
+		// localRedirectURI:      configReader.getEnvOpt("REDIRECT_URI"),
+		// redisClusterHosts:     configReader.getEnvOpt("REDIS_CLUSTER_HOSTS"),
 		debug:                 configReader.getEnvBoolOpt("DEBUG"),
 		local:                 configReader.getEnvBoolOpt("LOCAL"),
 		traceProbability:      configReader.getEnvFloat("TRACE_PROBABILITY"),
@@ -134,41 +134,41 @@ func main() {
 	}
 	env.diceServerClient = diceServerClient
 
-	// Redis Client
-	var redisClient redis.Cmdable
-	if env.isLocal() {
-		fmt.Printf("Creating redis client with port: %v\n", env.config.redisPort)
-		redisClient = redis.NewClient(&redis.Options{
-			Addr:     env.config.redisPort,
-			Password: "", // no password set
-			DB:       0,  // use default DB
-		})
-	} else {
-		clusterURIs := strings.Split(env.config.redisClusterHosts, ";")
-		for i, s := range clusterURIs {
-			clusterURIs[i] = fmt.Sprintf("%s%s", strings.TrimSpace(s), env.config.redisPort)
-		}
-		env.log.Debugf("Creating redis cluster client with URIs: %v\n", clusterURIs)
-		redisClient = redis.NewClusterClient(&redis.ClusterOptions{
-			Addrs:    clusterURIs,
-			Password: "",
-		})
-	}
+	// // Redis Client
+	// var redisClient redis.Cmdable
+	// if env.isLocal() {
+	// 	fmt.Printf("Creating redis client with port: %v\n", env.config.redisPort)
+	// 	redisClient = redis.NewClient(&redis.Options{
+	// 		Addr:     env.config.redisPort,
+	// 		Password: "", // no password set
+	// 		DB:       0,  // use default DB
+	// 	})
+	// } else {
+	// 	clusterURIs := strings.Split(env.config.redisClusterHosts, ";")
+	// 	for i, s := range clusterURIs {
+	// 		clusterURIs[i] = fmt.Sprintf("%s%s", strings.TrimSpace(s), env.config.redisPort)
+	// 	}
+	// 	env.log.Debugf("Creating redis cluster client with URIs: %v\n", clusterURIs)
+	// 	redisClient = redis.NewClusterClient(&redis.ClusterOptions{
+	// 		Addrs:    clusterURIs,
+	// 		Password: "",
+	// 	})
+	// }
 
 	// Cloud Datastore Client
-	dsClient, err := datastore.NewClient(ctx, env.config.projectID)
-	if err != nil {
-		log.Fatalf("could not configure Datastore Client: %s", err)
-	}
+	// dsClient, err := datastore.NewClient(ctx, env.config.projectID)
+	// if err != nil {
+	// 	log.Fatalf("could not configure Datastore Client: %s", err)
+	// }
 
 	// Call chat-clients init
-	slackChatClient := NewSlackChatClient(env.log, redisClient, dsClient, env.traceClient, env.diceServerClient, env.config)
+	// slackChatClient := NewSlackChatClient(env.log, redisClient, dsClient, env.traceClient, env.diceServerClient, env.config)
 
 	// Define inbound Routes
 	r := mux.NewRouter()
 	r.Handle("/roll", handler.Handler{Env: env, H: RESTRollHandler})
-	r.Handle("/slack/oauth", handler.Handler{Env: slackChatClient, H: SlackOAuthHandler})
-	r.Handle("/slack/slash/roll", handler.Handler{Env: slackChatClient, H: SlackSlashRollHandler})
+	// r.Handle("/slack/oauth", handler.Handler{Env: slackChatClient, H: SlackOAuthHandler})
+	// r.Handle("/slack/slash/roll", handler.Handler{Env: slackChatClient, H: SlackSlashRollHandler})
 	r.Handle("/", handler.Handler{Env: env, H: rootHandler})
 
 	// Add OpenCensus HTTP Handler Wrapper
@@ -176,14 +176,14 @@ func main() {
 
 	// Define a server with timeouts
 	srv := &http.Server{
-		Addr:         env.config.serverPort,
+		Addr:         env.config.chatClientServerPort,
 		WriteTimeout: time.Second * 15,
 		ReadTimeout:  time.Second * 15,
 		IdleTimeout:  time.Second * 60,
 		Handler:      openCensusWrapper, // Pass our instance of gorilla/mux and tracer in.
 
 	}
-	srv.RegisterOnShutdown(slackChatClient.Init(ctx))
+	// srv.RegisterOnShutdown(slackChatClient.Init(ctx))
 
 	// Run our server in a goroutine so that it doesn't block.
 	go func() {
