@@ -38,6 +38,7 @@ message Dice {
   int64 DropLowest = 9;
   bytes Chart = 10;
   map<int64, double> Probabilities = 11;
+  double ExpectedValue = 12;
 }
 message DiceSet {
   repeated Dice Dice = 1;
