@@ -214,9 +214,8 @@ func diceToPbDice(p bool, c bool, dice ...dicelang.Dice) []*pb.Dice {
 		dice.Min = d.Min
 		dice.Sides = d.Sides
 		dice.Total = d.Total
-		if p {
-			dice.Probabilities = dicelang.DiceProbability(dice.Count, dice.Sides, dice.DropHighest, dice.DropLowest)
-		}
+		dice.Probabilities = dicelang.DiceProbability(dice.Count, dice.Sides, dice.DropHighest, dice.DropLowest)
+		dice.ExpectedValue = dicelang.ExpectedValue(dice.Probabilities)
 		if c {
 			dice.Chart = []byte{}
 		}
