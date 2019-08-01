@@ -1,13 +1,12 @@
 package dicelang
 
-import "fmt"
+type pmf map[int64]float64 // in our case the pmf maps the integer result to probability as a percentage
 
-//ExportedValue takes a probability mass function(pmf) and returns an expected value(eX)
-func ExpectedValue(pmf map[int64]float64) float64 {
+//ExpectedValue takes a probability mass function(pmf) and returns an expected value(eX)
+func ExpectedValue(pmf) float64 {
 	eX := 0.0
 	for value, probability := range pmf {
-		fmt.Println()
-		eX += float64(value) * probability
+		eX += (float64(value) * probability) / 100
 	}
 	return eX
 }
