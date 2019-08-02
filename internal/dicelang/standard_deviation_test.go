@@ -24,10 +24,10 @@ func TestStandardDeviation(t *testing.T) {
 			input: inputs {
 				a: 2.5,
 				b: pmf{
-					1: 0.25,
-					2: 0.25,
-					3: 0.25,
-					4: 0.25,
+					1: 25.0,
+					2: 25.0,
+					3: 25.0,
+					4: 25.0,
 				},
 			},
 			output: 1.118033988749895,
